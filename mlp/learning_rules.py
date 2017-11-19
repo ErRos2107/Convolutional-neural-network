@@ -160,3 +160,173 @@ class MomentumLearningRule(GradientDescentLearningRule):
             mom *= self.mom_coeff
             mom -= self.learning_rate * grad
             param += mom
+
+class RMSPropLearningRule(GradientDescentLearningRule):
+    """Gradient descent with RMSProp learning rule.
+
+    This extends the basic gradient learning rule by introducing extra
+    RMSProp state variables for each parameter. RMSProp force the number we divide 
+    by to be very similar for adjacent mini-batches. Keep a moving average of the 
+    squared	gradient for each weight.
+
+    For parameter p[i] and corresponding RMSProp S[i] the updates for a
+    scalar loss function `L` are of the form
+        For each iteration t, Compute dW, db on the current mini-batch, then:
+		1. S_dW𝑑𝑊:=𝛽beta*S_dW𝑑𝑊+(1−𝛽beta)𝑑*dW^2, bias as well
+		2. W𝑊:=𝑊W − learning_rate * dW/sqrt(S_dW), so as bias
+
+    with `learning_rate` a positive scaling parameter for the gradient updates
+    and `beta` a value in [0, 1] that determines the exponentially weighted averages.
+    """
+
+    def __init__(self, learning_rate=1e-3, beta=0.9):
+        """Creates a new learning rule object.
+
+        Args:
+            learning_rate: A postive scalar to scale gradient updates to the
+                parameters by. This needs to be carefully set - if too large
+                the learning dynamic will be unstable and may diverge, while
+                if set too small learning will proceed very slowly.
+            beta: Exponential decay hyperparameter for the estimates, range [0, 1] 
+            inclusive. Normally set to 0.9.
+        """
+        super(RMSPropLearningRule, self).__init__(learning_rate)
+        assert beta >= 0. and beta <= 1., (
+            'beta should be in the range [0, 1].'
+        )
+        self.beta = beta
+        self.epsilon = 1e-8 # to avoid dividing zero
+        #self.iter = 0 # track the interation throgh batches
+
+    def initialise(self, params):
+        """Initialises the state of the learning rule for a set or parameters.
+
+        This must be called before `update_params` is first called.
+
+        Args:
+            params: A list of the parameters to be optimised. Note these will
+                be updated *in-place* to avoid reallocating arrays on each
+                update.
+        """
+        super(RMSPropLearningRule, self).initialise(params)
+        self.rms = []
+        for param in self.params:
+            self.rms.append(np.zeros_like(param))
+        #self.iter=0    
+
+    def reset(self):
+        """Resets any additional state variables to their intial values.
+
+        For this learning rule this corresponds to zeroing all the rms.
+        """
+        for s in zip(self.rms):
+            s *= 0.
+        #self.iter=0    
+
+    def update_params(self, grads_wrt_params):
+        """Applies a single update to all parameters.
+
+        All parameter updates are performed using in-place operations and so
+        nothing is returned.
+
+        Args:
+            grads_wrt_params: A list of gradients of the scalar loss function
+                with respect to each of the parameters passed to `initialise`
+                previously, with this list expected to be in the same order.
+        """
+        self.iter+=1 # update iteration
+        for param, s, grad in zip(self.params, self.rms, grads_wrt_params):
+            # s = beta*s+(1-beta)dw^2
+            
+            s += (self.beta-1)*s + (1-self.beta)* grad**2
+            
+            #s *= self.beta
+            #s += (1-self.beta)* grad**2
+            
+            #s /= 1-self.beta**self.iter # bias correction
+            
+            param -= self.learning_rate*grad/(np.sqrt(s)+self.epsilon)
+            
+            
+class AdamLearningRule(GradientDescentLearningRule):
+    """Gradient descent with Adam learning rule.
+
+    This extends the basic gradient learning rule by introducing extra
+    Adam state variables for each parameter. Adam force the number we divide 
+    by to be very similar for adjacent mini-batches. Keep a moving average of the 
+    squared	gradient for each weight.
+
+    For parameter p[i] and corresponding Adam S[i] the updates for a
+    scalar loss function `L` are of the form
+        For each iteration t, Compute dW, db on the current mini-batch, then:
+		1. Mom_dW𝑑𝑊:=𝛽beta1*Mom_dW𝑑𝑊+(1−𝛽beta1)𝑑*dW^2
+        2. S_dW𝑑𝑊:=𝛽beta2*S_dW𝑑𝑊+(1−𝛽beta2)𝑑*dW^2, bias as well
+		2. W𝑊:=𝑊W − learning_rate * Mom_dW/sqrt(S_dW), so as bias
+
+    with `learning_rate` a positive scaling parameter for the gradient updates
+    and `beta` values in [0, 1] that determines the exponentially weighted averages.
+    """
+
+    def __init__(self, learning_rate=1e-3, beta1=0.9,beta2=0.999):
+        """Creates a new learning rule object.
+
+        Args:
+            learning_rate: A postive scalar to scale gradient updates to the
+                parameters by. This needs to be carefully set - if too large
+                the learning dynamic will be unstable and may diverge, while
+                if set too small learning will proceed very slowly.
+            beta: Exponential decay hyperparameter for the estimates, range [0, 1] 
+            inclusive. Normally set to 0.9.
+        """
+        super(AdamLearningRule, self).__init__(learning_rate)
+        assert beta1 >= 0. and beta1 <= 1. and beta2 >=0. and beta2 <= 1., (
+            'beta should be in the range [0, 1].'
+        )
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = 1e-8 # to avoid dividing zero
+
+    def initialise(self, params):
+        """Initialises the state of the learning rule for a set or parameters.
+
+        This must be called before `update_params` is first called.
+
+        Args:
+            params: A list of the parameters to be optimised. Note these will
+                be updated *in-place* to avoid reallocating arrays on each
+                update.
+        """
+        super(AdamLearningRule, self).initialise(params)
+        self.moms = []
+        self.rms = []
+        for param in self.params:
+            self.moms.append(np.zeros_like(param))
+            self.rms.append(np.zeros_like(param))
+
+    def reset(self):
+        """Resets any additional state variables to their intial values.
+
+        For this learning rule this corresponds to zeroing all the rms.
+        """
+        for mom,s in zip(self.moms,self.rms):
+            mom *= 0.
+            s *= 0.
+
+    def update_params(self, grads_wrt_params):
+        """Applies a single update to all parameters.
+
+        All parameter updates are performed using in-place operations and so
+        nothing is returned.
+
+        Args:
+            grads_wrt_params: A list of gradients of the scalar loss function
+                with respect to each of the parameters passed to `initialise`
+                previously, with this list expected to be in the same order.
+        """
+        for param, mom, s, grad in zip(self.params, self.moms, self.rms, grads_wrt_params):
+            # s = beta*s+(1-beta)dw^2
+            mom += (self.beta1-1)*mom + (1-self.beta1)* grad
+            s += (self.beta2-1)*s + (1-self.beta2)* grad**2
+            #s *= self.beta
+            #s += (1-beta)* grad**2
+            param -= self.learning_rate*mom/(np.sqrt(s)+self.epsilon)            

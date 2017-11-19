@@ -330,35 +330,58 @@ class AffineLayer(LayerWithParameters):
             self.input_dim, self.output_dim)
 
 class BatchNormalizationLayer(StochasticLayerWithParameters):
-    """Layer implementing an affine tranformation of its inputs.
+    """Layer implementing an batch normalization of its inputs.
 
-    This layer is parameterised by a weight matrix and bias vector.
+    This layer is parameterised by a gamma and beta vector.
     """
 
     def __init__(self, input_dim, rng=None):
         """Initialises a parameterised affine layer.
-
         Args:
+            rng (RandomState): A seeded random number generator.
             input_dim (int): Dimension of inputs to the layer.
             output_dim (int): Dimension of the layer outputs.
-            weights_initialiser: Initialiser for the weight parameters.
-            biases_initialiser: Initialiser for the bias parameters.
-            weights_penalty: Weights-dependent penalty term (regulariser) or
-                None if no regularisation is to be applied to the weights.
-            biases_penalty: Biases-dependent penalty term (regulariser) or
-                None if no regularisation is to be applied to the biases.
         """
+        
         super(BatchNormalizationLayer, self).__init__(rng)
         self.beta = np.random.normal(size=(input_dim))
         self.gamma = np.random.normal(size=(input_dim))
+        self.running_mean=np.zeros(input_dim)
+        self.running_var=np.zeros(input_dim)
         self.epsilon = 0.00001
         self.cache = None
         self.input_dim = input_dim
 
-    def fprop(self, inputs, stochastic=True):
-        """Forward propagates inputs through a layer."""
 
-        raise NotImplementedError
+    def fprop(self, inputs, stochastic=True):
+        """Forward propagates inputs through a layer.
+        Inputs: incoming z with shape = (batch_size, input_dim)
+        stochastic: Flag allowing different deterministic
+                forward-propagation mode in addition to default stochastic
+                forward-propagation e.g. for use at test time. If False
+                a deterministic forward-propagation transformation
+                corresponding to the expected output of the stochastic
+                forward-propagation is applied.
+        Returns:
+            outputs: Array of layer outputs of shape (batch_size, output_dim).
+        """
+        if stochastic: # training 
+            batch_mean = np.mean(inputs, axis=0) # (1, input_dim)
+            batch_var = np.var(inputs, axis=0) # (1, input_dim)
+            z_norm = (inputs - batch_mean) / np.sqrt(batch_var + self.epsilon)
+
+            self.running_mean = 0.9 * self.running_mean + 0.1* batch_mean
+            self.running_var = 0.9 * self.running_var + 0.1* batch_var
+
+            z_bnorm = self.gamma * z_norm + self.beta
+            self.cache = (z_norm, batch_var, batch_mean)
+        
+        else: # valid / testing
+            scale = self.gamma / np.sqrt(self.running_var + self.epsilon)
+            #z_bnorm = x * scale + (beta - running_mean * scale)
+            z_bnorm = scale*(inputs-self.running_mean)+ self.beta
+        
+        return z_bnorm
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
@@ -378,7 +401,23 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
             (batch_size, input_dim).
         """
 
-        raise NotImplementedError
+        #dx, dgamma, dbeta = None, None, None
+
+        z_norm, batch_var, batch_mean = self.cache
+        batch_size = inputs.shape[0]
+        
+        dz_norm = self.gamma * grads_wrt_outputs
+        dvar = np.sum(dz_norm * (inputs - batch_mean)* -0.5*(batch_var + self.epsilon)** -1.5, axis=0)
+        dz_norm_inputs = 1 / np.sqrt(batch_var + self.epsilon)
+        dvar_inputs = 2 * (inputs - batch_mean) / batch_size
+
+        # intermediate for convenient calculation
+        di = dz_norm * dz_norm_inputs + dvar * dvar_inputs #(bat,input_dim)
+        #dmean = -1 * np.sum(di, axis=0) #(1,input_dim)
+        #dmean_inputs = np.ones_like(inputs) / batch_size # inputs.shape
+        #grads_wrt_inputs =  di + dmean * dmean_inputs
+        
+        return di -1/batch_size*np.sum(di, axis=0)
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
@@ -390,9 +429,12 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
 
         Returns:
             list of arrays of gradients with respect to the layer parameters
-            `[grads_wrt_weights, grads_wrt_biases]`.
+            `[grads_wrt_gamma, grads_wrt_beta]`.
         """
-        raise NotImplementedError
+        z_norm, batch_var, batch_mean = self.cache
+        grads_wrt_gamma = np.sum(grads_wrt_outputs * z_norm, axis=0)
+        grads_wrt_beta = np.sum(grads_wrt_outputs, axis=0)
+        return [grads_wrt_gamma, grads_wrt_beta]
 
     def params_penalty(self):
         """Returns the parameter dependent penalty term for this layer.
