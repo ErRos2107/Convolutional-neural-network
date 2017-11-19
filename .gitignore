@@ -1,3 +1,6 @@
+#jupyter notebook
+*.ipynb_checkpoints
+
 #dropbox stuff
 *.dropbox*
 
