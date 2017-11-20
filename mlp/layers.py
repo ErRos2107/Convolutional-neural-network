@@ -15,10 +15,11 @@ respect to the layer parameters.
 import numpy as np
 import mlp.initialisers as init
 from mlp import DEFAULT_SEED
+from numba import jit
 
 class Layer(object):
     """Abstract class defining the interface for a layer."""
-
+    
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
 
@@ -513,7 +514,7 @@ class ConvolutionalLayer(LayerWithParameters):
         output_dim_1 = input_dim_1 - kernel_dim_1 + 1
         output_dim_2 = input_dim_2 - kernel_dim_2 + 1
     """
-
+    
     def __init__(self, num_input_channels, num_output_channels,
                  input_dim_1, input_dim_2,
                  kernel_dim_1, kernel_dim_2,
@@ -565,16 +566,17 @@ class ConvolutionalLayer(LayerWithParameters):
 
         self.cache = None
 
+    @jit    
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
         corresponds to `y = conv2d(x, K) + b`.
         Args:
-            inputs: Array of layer inputs of shape (batch_size, input_dim).
+            inputs: Array of layer inputs of shape (batch_size, input_dim_1, input_dim_2, in_channels).
         Returns:
-            outputs: Array of layer outputs of shape (batch_size, output_dim).
+            outputs: Array of layer outputs of shape (batch_size, num_output_channels, output_dim_1, output_dim_2).
         """
-        raise NotImplementedError
+        
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
