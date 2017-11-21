@@ -668,7 +668,7 @@ class ConvolutionalLayer(LayerWithParameters):
                  kernel_dim_1, kernel_dim_2,
                  kernels_init=init.UniformInit(-0.01, 0.01),
                  biases_init=init.ConstantInit(0.),
-                 kernels_penalty=None, biases_penalty=None, pad=0,stride=1):
+                 kernels_penalty=None, biases_penalty=None, pad=0, stride=1):
         """Initialises a parameterised convolutional layer.
         Args:
             num_input_channels (int): Number of channels in inputs to
@@ -731,6 +731,7 @@ class ConvolutionalLayer(LayerWithParameters):
         """
          # Add padding to each image
         inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
         #output_dim_1 = (self.input_dim_1 - self.kernel_dim_1+2*self.P)/self.S + 1
         #output_dim_2 = (self.input_dim_2 - self.kernel_dim_2+2*self.P)/self.S + 1
         batch_size = inputs.shape[0]
@@ -772,8 +773,11 @@ class ConvolutionalLayer(LayerWithParameters):
         dinputs = np.zeros(inputs.shape)
 
         # Pad the grads_wrt_outputs
-        dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-        inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        dinputs_pad = np.pad(dinputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
+        inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
+        #dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+
         #kernels_flip = self.kernels[:, :, ::-1, ::-1]
         for n in range(inputs.shape[0]):
             for k in range(self.num_output_channels):

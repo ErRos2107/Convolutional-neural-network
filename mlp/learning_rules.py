@@ -234,7 +234,7 @@ class RMSPropLearningRule(GradientDescentLearningRule):
                 with respect to each of the parameters passed to `initialise`
                 previously, with this list expected to be in the same order.
         """
-        self.iter+=1 # update iteration
+        #self.iter+=1 # update iteration
         for param, s, grad in zip(self.params, self.rms, grads_wrt_params):
             # s = beta*s+(1-beta)dw^2
             
