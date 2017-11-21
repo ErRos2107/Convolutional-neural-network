@@ -16,10 +16,11 @@ import numpy as np
 import mlp.initialisers as init
 from mlp import DEFAULT_SEED
 from numba import jit
+from scipy.signal import convolve2d
 
 class Layer(object):
     """Abstract class defining the interface for a layer."""
-    
+
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
 
@@ -343,7 +344,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
             input_dim (int): Dimension of inputs to the layer.
             output_dim (int): Dimension of the layer outputs.
         """
-        
+
         super(BatchNormalizationLayer, self).__init__(rng)
         self.beta = np.random.normal(size=(input_dim))
         self.gamma = np.random.normal(size=(input_dim))
@@ -366,7 +367,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        if stochastic: # training 
+        if stochastic: # training
             batch_mean = np.mean(inputs, axis=0) # (1, input_dim)
             batch_var = np.var(inputs, axis=0) # (1, input_dim)
             z_norm = (inputs - batch_mean) / np.sqrt(batch_var + self.epsilon)
@@ -376,12 +377,12 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
 
             z_bnorm = self.gamma * z_norm + self.beta
             self.cache = (z_norm, batch_var, batch_mean)
-        
+
         else: # valid / testing
             scale = self.gamma / np.sqrt(self.running_var + self.epsilon)
             #z_bnorm = x * scale + (beta - running_mean * scale)
             z_bnorm = scale*(inputs-self.running_mean)+ self.beta
-        
+
         return z_bnorm
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -406,7 +407,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
 
         z_norm, batch_var, batch_mean = self.cache
         batch_size = inputs.shape[0]
-        
+
         dz_norm = self.gamma * grads_wrt_outputs
         dvar = np.sum(dz_norm * (inputs - batch_mean)* -0.5*(batch_var + self.epsilon)** -1.5, axis=0)
         dz_norm_inputs = 1 / np.sqrt(batch_var + self.epsilon)
@@ -417,7 +418,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
         #dmean = -1 * np.sum(di, axis=0) #(1,input_dim)
         #dmean_inputs = np.ones_like(inputs) / batch_size # inputs.shape
         #grads_wrt_inputs =  di + dmean * dmean_inputs
-        
+
         return di -1/batch_size*np.sum(di, axis=0)
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
@@ -500,6 +501,47 @@ class SigmoidLayer(Layer):
     def __repr__(self):
         return 'SigmoidLayer'
 
+class MaxPoolingLayer(Layer):
+    """Layer implementing a max-pooling layer.
+    Non-overlapping pooling is required."""
+
+    def fprop(self, inputs):
+        """Forward propagates activations through the layer transformation.
+
+        For inputs `x` and outputs `y` this corresponds to
+        `y = 1 / (1 + exp(-x))`.
+
+        Args:
+            inputs: Array of layer inputs of shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+
+        Returns:
+            outputs: Array of layer outputs of shape (batch_size, output_dim).
+        """
+        return 1. / (1. + np.exp(-inputs))
+
+    def bprop(self, inputs, outputs, grads_wrt_outputs):
+        """Back propagates gradients through a layer.
+
+        Given gradients with respect to the outputs of the layer calculates the
+        gradients with respect to the layer inputs.
+
+        Args:
+            inputs: Array of layer inputs of shape (batch_size, input_dim).
+            outputs: Array of layer outputs calculated in forward pass of
+                shape (batch_size, output_dim).
+            grads_wrt_outputs: Array of gradients with respect to the layer
+                outputs of shape (batch_size, output_dim).
+
+        Returns:
+            Array of gradients with respect to the layer inputs of shape
+            (batch_size, input_dim).
+        """
+        return grads_wrt_outputs * outputs * (1. - outputs)
+
+    def __repr__(self):
+        return 'SigmoidLayer'
+
 class ConvolutionalLayer(LayerWithParameters):
     """Layer implementing a 2D convolution-based transformation of its inputs.
     The layer is parameterised by a set of 2D convolutional kernels, a four
@@ -514,13 +556,13 @@ class ConvolutionalLayer(LayerWithParameters):
         output_dim_1 = input_dim_1 - kernel_dim_1 + 1
         output_dim_2 = input_dim_2 - kernel_dim_2 + 1
     """
-    
+
     def __init__(self, num_input_channels, num_output_channels,
                  input_dim_1, input_dim_2,
                  kernel_dim_1, kernel_dim_2,
                  kernels_init=init.UniformInit(-0.01, 0.01),
                  biases_init=init.ConstantInit(0.),
-                 kernels_penalty=None, biases_penalty=None):
+                 kernels_penalty=None, biases_penalty=None, pad=0,stride=1):
         """Initialises a parameterised convolutional layer.
         Args:
             num_input_channels (int): Number of channels in inputs to
@@ -551,6 +593,8 @@ class ConvolutionalLayer(LayerWithParameters):
         self.input_dim_2 = input_dim_2
         self.kernel_dim_1 = kernel_dim_1
         self.kernel_dim_2 = kernel_dim_2
+        self.output_dim_1 = (input_dim_1 - kernel_dim_1+2*pad)//stride + 1
+        self.output_dim_2 = (input_dim_2 - kernel_dim_2+2*pad)//stride + 1
         self.kernels_init = kernels_init
         self.biases_init = biases_init
         self.kernels_shape = (
@@ -563,21 +607,44 @@ class ConvolutionalLayer(LayerWithParameters):
         self.biases = self.biases_init(num_output_channels)
         self.kernels_penalty = kernels_penalty
         self.biases_penalty = biases_penalty
-
+        self.P = pad
+        self.S = stride
         self.cache = None
 
-    @jit    
+    @jit
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
         corresponds to `y = conv2d(x, K) + b`.
         Args:
-            inputs: Array of layer inputs of shape (batch_size, input_dim_1, input_dim_2, in_channels).
+            inputs: Array of layer inputs of shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
         Returns:
-            outputs: Array of layer outputs of shape (batch_size, num_output_channels, output_dim_1, output_dim_2).
+            outputs: Array of layer outputs of shape
+            (batch_size, num_output_channels, output_dim_1, output_dim_2).
         """
-        
+         # Add padding to each image
+        inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #output_dim_1 = (self.input_dim_1 - self.kernel_dim_1+2*self.P)/self.S + 1
+        #output_dim_2 = (self.input_dim_2 - self.kernel_dim_2+2*self.P)/self.S + 1
+        batch_size = inputs.shape[0]
 
+        output = np.zeros((batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
+        for n in range(batch_size): # interate over samples in the batch_size
+            for k in range(self.num_output_channels): # iterate over kernels
+                for h in range(self.output_dim_1):
+                    for w in range(self.output_dim_2):
+                        h_start = h*self.S
+                        h_end = h_start+self.kernel_dim_1
+                        w_start = w*self.S
+                        w_end = w_start+self.kernel_dim_2
+                        output[n,k,h,w]= np.sum(inputs_pad[n, :, h_start:h_end, w_start:w_end]
+                        * self.kernels[k, ...]) + self.biases[k]
+                        #convolve2d( , self.kernels[k,...])
+        assert(output.shape == (batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
+        return output
+
+    @jit
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
         Given gradients with respect to the outputs of the layer calculates the
@@ -595,10 +662,38 @@ class ConvolutionalLayer(LayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
+        #(batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
+        dinputs = np.zeros(inputs.shape)
+
         # Pad the grads_wrt_outputs
+        dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #kernels_flip = self.kernels[:, :, ::-1, ::-1]
+        for n in range(inputs.shape[0]):
+            for k in range(self.num_output_channels):
+                for h in range(self.output_dim_1):
+                    for w in range(self.output_dim_2):
+                        # Use the corners to define the slice from inputs_pad
+                        h_start = h*self.S
+                        h_end = h_start+self.kernel_dim_1
+                        w_start = w*self.S
+                        w_end = w_start+self.kernel_dim_2
+                        a_slice = inputs_pad[n, :, h_start:h_end, w_start:w_end]
+                        # Update gradients for the window and the filter's parameters
+                        dinputs_pad[n,:, h_start:h_end, w_start:w_end] += (self.kernels[k,...]
+                        * grads_wrt_outputs[n, k, h, w])
 
-        raise NotImplementedError
+            # Unpaded
+            if self.P>0:
+                dinputs[n, :, :, :] = dinputs_pad[n,:,self.P:-self.P, self.P:-self.P]
 
+        assert(dinputs.shape == inputs.shape)
+        if self.P>0:
+            return dinputs
+        else:
+            return dinputs_pad
+
+    @jit
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
         Args:
@@ -610,8 +705,25 @@ class ConvolutionalLayer(LayerWithParameters):
             list of arrays of gradients with respect to the layer parameters
             `[grads_wrt_kernels, grads_wrt_biases]`.
         """
+        dkernels = np.zeros(self.kernels.shape)
+        dbiases = np.zeros(self.biases.shape)
+        for n in range(inputs.shape[0]):
+            for k in range(self.num_output_channels):
+                for h in range(self.output_dim_1):
+                    for w in range(self.output_dim_2):
+                        # Use the corners to define the slice from inputs_pad
+                        h_start = h*self.S
+                        h_end = h_start+self.kernel_dim_1
+                        w_start = w*self.S
+                        w_end = w_start+self.kernel_dim_2
+                        a_slice = inputs[n, :, h_start:h_end, w_start:w_end]
+                        # Update gradients for the window and the filter's parameters
+                        dkernels[k,...] += a_slice * grads_wrt_outputs[n, k, h, w]
 
-        raise NotImplementedError
+        for k in range(self.num_output_channels):
+             dbiases[k] = np.sum(grads_wrt_outputs[:, k, :, :])
+
+        return [dkernels,dbiases]
 
     def params_penalty(self):
         """Returns the parameter dependent penalty term for this layer.
