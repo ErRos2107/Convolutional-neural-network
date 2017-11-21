@@ -502,45 +502,151 @@ class SigmoidLayer(Layer):
         return 'SigmoidLayer'
 
 class MaxPoolingLayer(Layer):
-    """Layer implementing a max-pooling layer.
-    Non-overlapping pooling is required."""
-
+    """Layer implementing a Non-overlapping max-pooling layer. """
+    def __init__(self, pool_size=2, overlap=False, stride=2):
+        """Default non-overlapping pooling."""
+        #self.overlap = overlap
+        self.pool_size = pool_size
+        if not overlap:
+            self.S = pool_size
+        else:
+            self.S = stride
+        #self.output_dim_1 = (input_dim_1 - pool_size)//self.S + 1
+        #self.output_dim_2 = (input_dim_2 - pool_size)//self.S + 1
+    @jit
     def fprop(self, inputs):
-        """Forward propagates activations through the layer transformation.
+        """Implements the forward pass of the pooling layer.
+        Args:
+            inputs: shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+        Returns:
+            outputs: shape
+            (batch_size, num_output_channels, output_dim_1, output_dim_2).
+        output_dim_1 = (input_dim_1 - pool_size)//stride + 1
+        output_dim_2 = (input_dim_2 - pool_size)//stride + 1
+        """
+        (batch_size, num_input_channels, input_dim_1, input_dim_2)=inputs.shape
+        output_dim_1 = (input_dim_1 - self.pool_size)//self.S + 1
+        output_dim_2 = (input_dim_2 - self.pool_size)//self.S + 1
+        num_output_channels=num_input_channels
+        output = np.zeros((batch_size, num_output_channels, output_dim_1, output_dim_2))
+        #for n in range(batch_size): # interate over samples in the batch_size
+        for k in range(num_output_channels):
+            for h in range(output_dim_1):
+                for w in range(output_dim_2):
+                    h_start = h*self.S
+                    h_end = h_start+self.pool_size
+                    w_start = w*self.S
+                    w_end = w_start+self.pool_size
+                    output[:,k,h,w]= np.amax(
+                    inputs[:, k, h_start:h_end, w_start:w_end], axis=(-2,-1))
+        return output
 
-        For inputs `x` and outputs `y` this corresponds to
-        `y = 1 / (1 + exp(-x))`.
+    @jit
+    def fprop_naive(self, inputs):
+        """Implements the forward pass of the pooling layer.
+        Args:
+            inputs: shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+        Returns:
+            outputs: shape
+            (batch_size, num_output_channels, output_dim_1, output_dim_2).
+        output_dim_1 = (input_dim_1 - pool_size)//stride + 1
+        output_dim_2 = (input_dim_2 - pool_size)//stride + 1
+        """
+        (batch_size, num_input_channels, input_dim_1, input_dim_2)=inputs.shape
+        output_dim_1 = (input_dim_1 - self.pool_size)//self.S + 1
+        output_dim_2 = (input_dim_2 - self.pool_size)//self.S + 1
+        num_output_channels=num_input_channels
+        output = np.zeros((batch_size, num_output_channels, output_dim_1, output_dim_2))
+        for n in range(batch_size): # interate over samples in the batch_size
+            for k in range(num_output_channels):
+                for h in range(output_dim_1):
+                    for w in range(output_dim_2):
+                        h_start = h*self.S
+                        h_end = h_start+self.pool_size
+                        w_start = w*self.S
+                        w_end = w_start+self.pool_size
+                        output[n,k,h,w]= np.max(
+                        inputs[n, k, h_start:h_end, w_start:w_end])
+        return output
 
+    @jit
+    def bprop_fast(self, inputs, outputs, grads_wrt_outputs):
+        """ Not work yet
+        Back propagates gradients through a layer.
         Args:
             inputs: Array of layer inputs of shape
-            (batch_size, num_input_channels, input_dim_1, input_dim_2).
-
-        Returns:
-            outputs: Array of layer outputs of shape (batch_size, output_dim).
-        """
-        return 1. / (1. + np.exp(-inputs))
-
-    def bprop(self, inputs, outputs, grads_wrt_outputs):
-        """Back propagates gradients through a layer.
-
-        Given gradients with respect to the outputs of the layer calculates the
-        gradients with respect to the layer inputs.
-
-        Args:
-            inputs: Array of layer inputs of shape (batch_size, input_dim).
-            outputs: Array of layer outputs calculated in forward pass of
-                shape (batch_size, output_dim).
+                (batch_size, num_input_channels, input_dim_1, input_dim_2).
+            outputs: Array of layer outputs calculated in forward pass of shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
             grads_wrt_outputs: Array of gradients with respect to the layer
-                outputs of shape (batch_size, output_dim).
-
+                outputs of shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
         Returns:
             Array of gradients with respect to the layer inputs of shape
-            (batch_size, input_dim).
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
         """
-        return grads_wrt_outputs * outputs * (1. - outputs)
+        (batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
+        dinputs = np.zeros(inputs.shape)
+
+        #for n in range(inputs.shape[0]):
+        for k in range(num_output_channels):
+            for h in range(output_dim_1):
+                for w in range(output_dim_2):
+                    # Use the corners to define the slice from inputs_pad
+                    h_start = h*self.S
+                    h_end = h_start+self.pool_size
+                    w_start = w*self.S
+                    w_end = w_start+self.pool_size
+                    #a_slice = inputs_pad[n, :, h_start:h_end, w_start:w_end]
+                    # Update gradients for the window and the filter's parameters
+                    x = inputs[:, k, h_start:h_end, w_start:w_end]
+                    print(np.array([xx== np.amax(xx,axis=(-2,-1)) for xx in x]).shape)
+                    #mask = np.array([xx== np.amax(xx,axis=(-2,-1)) for xx in x])
+                    #dinputs[:,k, h_start:h_end, w_start:w_end] += ((x == np.amax(x, axis=(-2,-1)))
+                    #* grads_wrt_outputs[:, k, h, w])
+                    dinputs[:,k, h_start:h_end, w_start:w_end] += (mask
+                    * grads_wrt_outputs[:, k, h, w][..., None,None])
+
+
+        return dinputs
+
+    @jit
+    def bprop(self, inputs, outputs, grads_wrt_outputs):
+        """Back propagates gradients through a layer.
+        Args:
+            inputs: Array of layer inputs of shape
+                (batch_size, num_input_channels, input_dim_1, input_dim_2).
+            outputs: Array of layer outputs calculated in forward pass of shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
+            grads_wrt_outputs: Array of gradients with respect to the layer
+                outputs of shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
+        Returns:
+            Array of gradients with respect to the layer inputs of shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+        """
+        (batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
+        dinputs = np.zeros(inputs.shape)
+
+        for n in range(inputs.shape[0]):
+            for k in range(num_output_channels):
+                for h in range(output_dim_1):
+                    for w in range(output_dim_2):
+                        # Use the corners to define the slice from inputs_pad
+                        h_start = h*self.S
+                        h_end = h_start+self.pool_size
+                        w_start = w*self.S
+                        w_end = w_start+self.pool_size
+                        # Update gradients for the window and the filter's parameters
+                        x = inputs[n, k, h_start:h_end, w_start:w_end]
+                        dinputs[n,k, h_start:h_end, w_start:w_end] += ((x == np.max(x))
+                        * grads_wrt_outputs[n, k, h, w])
+        return dinputs
 
     def __repr__(self):
-        return 'SigmoidLayer'
+        return 'MaxPoolingLayer'
 
 class ConvolutionalLayer(LayerWithParameters):
     """Layer implementing a 2D convolution-based transformation of its inputs.
@@ -553,8 +659,8 @@ class ConvolutionalLayer(LayerWithParameters):
     Assuming no-padding is applied to the inputs so that outputs are only
     calculated for positions where the kernel filters fully overlap with the
     inputs, and that unit strides are used the outputs will have spatial extent
-        output_dim_1 = input_dim_1 - kernel_dim_1 + 1
-        output_dim_2 = input_dim_2 - kernel_dim_2 + 1
+        output_dim_1 = (input_dim_1 - kernel_dim_1+2*pad)//stride + 1
+        output_dim_2 = (input_dim_2 - kernel_dim_2+2*pad)//stride + 1
     """
 
     def __init__(self, num_input_channels, num_output_channels,
@@ -660,7 +766,7 @@ class ConvolutionalLayer(LayerWithParameters):
                 (batch_size, num_output_channels, output_dim_1, output_dim_2).
         Returns:
             Array of gradients with respect to the layer inputs of shape
-            (batch_size, input_dim).
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
         """
         #(batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
         dinputs = np.zeros(inputs.shape)
