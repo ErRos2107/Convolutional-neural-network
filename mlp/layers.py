@@ -719,6 +719,36 @@ class ConvolutionalLayer(LayerWithParameters):
 
     @jit
     def fprop(self, inputs):
+        """ Use convolve2d to Implement the convolution. No padding.
+        Forward propagates activations through the layer transformation.
+        For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
+        corresponds to `y = conv2d(x, K) + b`.
+        Args:
+            inputs: Array of layer inputs of shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+        Returns:
+            outputs: Array of layer outputs of shape
+            (batch_size, num_output_channels, output_dim_1, output_dim_2).
+        """
+         # Add padding to each image
+        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
+        #output_dim_1 = (self.input_dim_1 - self.kernel_dim_1+2*self.P)/self.S + 1
+        #output_dim_2 = (self.input_dim_2 - self.kernel_dim_2+2*self.P)/self.S + 1
+        (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+
+        output = np.zeros((batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
+        for n in range(batch_size): # interate over samples in the batch_size
+            for k in range(self.num_output_channels): # iterate over kernels
+                for i in range(num_input_channels):
+                    output[n,k,...] += convolve2d(inputs[n,i,...], self.kernels[k,i,...], mode='valid')
+                output[n,k,...] += self.biases[k]
+
+        assert(output.shape == (batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
+        return output
+
+    @jit
+    def fprop_naive(self, inputs):
         """Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
         corresponds to `y = conv2d(x, K) + b`.
@@ -753,6 +783,45 @@ class ConvolutionalLayer(LayerWithParameters):
 
     @jit
     def bprop(self, inputs, outputs, grads_wrt_outputs):
+        """Back propagates gradients through a layer.
+        Given gradients with respect to the outputs of the layer calculates the
+        gradients with respect to the layer inputs.
+        Args:
+            inputs: Array of layer inputs of shape
+                (batch_size, num_input_channels, input_dim_1, input_dim_2).
+            outputs: Array of layer outputs calculated in forward pass of
+                shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
+            grads_wrt_outputs: Array of gradients with respect to the layer
+                outputs of shape
+                (batch_size, num_output_channels, output_dim_1, output_dim_2).
+        Returns:
+            Array of gradients with respect to the layer inputs of shape
+            (batch_size, num_input_channels, input_dim_1, input_dim_2).
+        """
+        (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        dinputs = np.zeros(inputs.shape)
+
+        # Pad the grads_wrt_outputs
+        grads_wrt_outputs_pad = np.pad(grads_wrt_outputs, ((0,),(0,),
+        (self.kernel_dim_1-1,), (self.kernel_dim_2-1,)),'constant')
+        #dinputs_pad = np.pad(dinputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
+        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
+        #dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
+
+        kernels_flip = self.kernels[:, :, ::-1, ::-1]
+        for n in range(inputs.shape[0]):
+            for k in range(self.num_output_channels):
+                for i in range(num_input_channels):
+                    dinputs[n,i,...] += convolve2d(grads_wrt_outputs_pad[n, k, ...], kernels_flip[k,i,...], mode='valid')
+                    #dinputs[n,k,...] += convolve2d(inputs[n,i,...], self.kernels[k,i,...], mode='valid')
+
+        return dinputs
+
+
+    @jit
+    def bprop_naive(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
         Given gradients with respect to the outputs of the layer calculates the
         gradients with respect to the layer inputs.
