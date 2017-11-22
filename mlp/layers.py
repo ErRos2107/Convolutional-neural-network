@@ -539,36 +539,6 @@ class MaxPoolingLayer(Layer):
         return output
 
     @jit
-    def fprop_naive(self, inputs):
-        """Implements the forward pass of the pooling layer.
-        Args:
-            inputs: shape
-            (batch_size, num_input_channels, input_dim_1, input_dim_2).
-        Returns:
-            outputs: shape
-            (batch_size, num_output_channels, output_dim_1, output_dim_2).
-        output_dim_1 = (input_dim_1 - pool_size)//stride + 1
-        output_dim_2 = (input_dim_2 - pool_size)//stride + 1
-        """
-        (batch_size, num_input_channels, input_dim_1, input_dim_2)=inputs.shape
-        output_dim_1 = (input_dim_1 - self.pool_size)//self.S + 1
-        output_dim_2 = (input_dim_2 - self.pool_size)//self.S + 1
-        num_output_channels=num_input_channels
-        output = np.zeros((batch_size, num_output_channels, output_dim_1, output_dim_2))
-        for n in range(batch_size): # interate over samples in the batch_size
-            for k in range(num_output_channels):
-                for h in range(output_dim_1):
-                    for w in range(output_dim_2):
-                        h_start = h*self.S
-                        h_end = h_start+self.pool_size
-                        w_start = w*self.S
-                        w_end = w_start+self.pool_size
-                        output[n,k,h,w]= np.max(
-                        inputs[n, k, h_start:h_end, w_start:w_end])
-        return output
-
-
-    @jit
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
         Args:
@@ -707,7 +677,7 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return out
 
-    
+
     @jit
     def fprop_im2col(self, inputs):
         """ A fast implementation the convolution based on image to col.
@@ -780,10 +750,10 @@ class ConvolutionalLayer(LayerWithParameters):
             `[grads_wrt_kernels, grads_wrt_biases]`.
         """
         # To pass the test, calculate the data again
-        inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
-        grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
-        #inputs_col = self.cache['inputs_col']
-        #grads_wrt_outputs_reshape = self.cache['grads_wrt_outputs_reshape']
+        #inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+        #grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
+        inputs_col = self.cache['inputs_col']
+        grads_wrt_outputs_reshape = self.cache['grads_wrt_outputs_reshape']
         dkernels = grads_wrt_outputs_reshape.dot(inputs_col.T).reshape(self.kernels.shape)
         dbiases = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
 
