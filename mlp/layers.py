@@ -898,6 +898,38 @@ class ConvolutionalLayer(LayerWithParameters):
                         a_slice = inputs[n, :, h_start:h_end, w_start:w_end]
                         # Update gradients for the window and the filter's parameters
                         dkernels[k,...] += a_slice * grads_wrt_outputs[n, k, h, w]
+        dkernels = dkernels[:, :, ::-1, ::-1]
+        for k in range(self.num_output_channels):
+             dbiases[k] = np.sum(grads_wrt_outputs[:, k, :, :])
+
+        return [dkernels,dbiases]
+
+    @jit
+    def grads_wrt_params_naive(self, inputs, grads_wrt_outputs):
+        """Calculates gradients with respect to layer parameters.
+        Args:
+            inputs: array of inputs to layer of shape (batch_size, input_dim)
+            grads_wrt_to_outputs: array of gradients with respect to the layer
+                outputs of shape
+                (batch_size, num_output-_channels, output_dim_1, output_dim_2).
+        Returns:
+            list of arrays of gradients with respect to the layer parameters
+            `[grads_wrt_kernels, grads_wrt_biases]`.
+        """
+        dkernels = np.zeros(self.kernels.shape)
+        dbiases = np.zeros(self.biases.shape)
+        for n in range(inputs.shape[0]):
+            for k in range(self.num_output_channels):
+                for h in range(self.output_dim_1):
+                    for w in range(self.output_dim_2):
+                        # Use the corners to define the slice from inputs_pad
+                        h_start = h*self.S
+                        h_end = h_start+self.kernel_dim_1
+                        w_start = w*self.S
+                        w_end = w_start+self.kernel_dim_2
+                        a_slice = inputs[n, :, h_start:h_end, w_start:w_end]
+                        # Update gradients for the window and the filter's parameters
+                        dkernels[k,...] += a_slice * grads_wrt_outputs[n, k, h, w]
 
         for k in range(self.num_output_channels):
              dbiases[k] = np.sum(grads_wrt_outputs[:, k, :, :])
