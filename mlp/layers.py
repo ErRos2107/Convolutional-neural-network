@@ -17,6 +17,8 @@ import mlp.initialisers as init
 from mlp import DEFAULT_SEED
 from numba import jit
 from scipy.signal import convolve2d
+from mlp.im2col import get_im2col_indices, im2col_indices, col2im_indices
+from collections import defaultdict
 
 class Layer(object):
     """Abstract class defining the interface for a layer."""
@@ -502,7 +504,7 @@ class SigmoidLayer(Layer):
         return 'SigmoidLayer'
 
 class MaxPoolingLayer(Layer):
-    """Layer implementing a Non-overlapping max-pooling layer. """
+    """Implementing a quare pooling regions with non-overlapping max-pooling layer."""
     def __init__(self, pool_size=2, overlap=False, stride=2):
         """Default non-overlapping pooling."""
         #self.overlap = overlap
@@ -511,6 +513,7 @@ class MaxPoolingLayer(Layer):
             self.S = pool_size
         else:
             self.S = stride
+        self.cache = defaultdict(None)
         #self.output_dim_1 = (input_dim_1 - pool_size)//self.S + 1
         #self.output_dim_2 = (input_dim_2 - pool_size)//self.S + 1
     @jit
@@ -526,20 +529,13 @@ class MaxPoolingLayer(Layer):
         output_dim_2 = (input_dim_2 - pool_size)//stride + 1
         """
         (batch_size, num_input_channels, input_dim_1, input_dim_2)=inputs.shape
-        output_dim_1 = (input_dim_1 - self.pool_size)//self.S + 1
-        output_dim_2 = (input_dim_2 - self.pool_size)//self.S + 1
-        num_output_channels=num_input_channels
-        output = np.zeros((batch_size, num_output_channels, output_dim_1, output_dim_2))
-        #for n in range(batch_size): # interate over samples in the batch_size
-        for k in range(num_output_channels):
-            for h in range(output_dim_1):
-                for w in range(output_dim_2):
-                    h_start = h*self.S
-                    h_end = h_start+self.pool_size
-                    w_start = w*self.S
-                    w_end = w_start+self.pool_size
-                    output[:,k,h,w]= np.amax(
-                    inputs[:, k, h_start:h_end, w_start:w_end], axis=(-2,-1))
+        assert input_dim_1 % self.pool_size == 0
+        assert input_dim_2 % self.pool_size == 0
+        inputs_reshape = inputs.reshape(batch_size, num_input_channels, input_dim_1//self.pool_size,
+                            self.pool_size, input_dim_2//self.pool_size, self.pool_size)
+        output = inputs_reshape.max(axis=3).max(axis=4)
+        self.cache['inputs_reshape'] = inputs_reshape
+
         return output
 
     @jit
@@ -571,46 +567,6 @@ class MaxPoolingLayer(Layer):
                         inputs[n, k, h_start:h_end, w_start:w_end])
         return output
 
-    @jit
-    def bprop_fast(self, inputs, outputs, grads_wrt_outputs):
-        """ Not work yet
-        Back propagates gradients through a layer.
-        Args:
-            inputs: Array of layer inputs of shape
-                (batch_size, num_input_channels, input_dim_1, input_dim_2).
-            outputs: Array of layer outputs calculated in forward pass of shape
-                (batch_size, num_output_channels, output_dim_1, output_dim_2).
-            grads_wrt_outputs: Array of gradients with respect to the layer
-                outputs of shape
-                (batch_size, num_output_channels, output_dim_1, output_dim_2).
-        Returns:
-            Array of gradients with respect to the layer inputs of shape
-            (batch_size, num_input_channels, input_dim_1, input_dim_2).
-        """
-        (batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
-        dinputs = np.zeros(inputs.shape)
-
-        #for n in range(inputs.shape[0]):
-        for k in range(num_output_channels):
-            for h in range(output_dim_1):
-                for w in range(output_dim_2):
-                    # Use the corners to define the slice from inputs_pad
-                    h_start = h*self.S
-                    h_end = h_start+self.pool_size
-                    w_start = w*self.S
-                    w_end = w_start+self.pool_size
-                    #a_slice = inputs_pad[n, :, h_start:h_end, w_start:w_end]
-                    # Update gradients for the window and the filter's parameters
-                    x = inputs[:, k, h_start:h_end, w_start:w_end]
-                    print(np.array([xx== np.amax(xx,axis=(-2,-1)) for xx in x]).shape)
-                    #mask = np.array([xx== np.amax(xx,axis=(-2,-1)) for xx in x])
-                    #dinputs[:,k, h_start:h_end, w_start:w_end] += ((x == np.amax(x, axis=(-2,-1)))
-                    #* grads_wrt_outputs[:, k, h, w])
-                    dinputs[:,k, h_start:h_end, w_start:w_end] += (mask
-                    * grads_wrt_outputs[:, k, h, w][..., None,None])
-
-
-        return dinputs
 
     @jit
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -627,22 +583,16 @@ class MaxPoolingLayer(Layer):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, num_input_channels, input_dim_1, input_dim_2).
         """
+        inputs_reshape = self.cache['inputs_reshape']
         (batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
-        dinputs = np.zeros(inputs.shape)
+        dinputs_reshape = np.zeros(inputs_reshape.shape)
+        mask = (inputs_reshape == outputs[:, :, :, np.newaxis, :, np.newaxis])
+        grads_wrt_outputs_addaxis = grads_wrt_outputs[:, :, :, np.newaxis, :, np.newaxis]
+        grads_wrt_outputs_broadcast, _ = np.broadcast_arrays(grads_wrt_outputs_addaxis, inputs_reshape)
+        dinputs_reshape[mask] = grads_wrt_outputs_broadcast[mask]
+        dinputs_reshape /= np.sum(mask, axis=(3, 5), keepdims=True)
+        dinputs = dinputs_reshape.reshape(inputs.shape)
 
-        for n in range(inputs.shape[0]):
-            for k in range(num_output_channels):
-                for h in range(output_dim_1):
-                    for w in range(output_dim_2):
-                        # Use the corners to define the slice from inputs_pad
-                        h_start = h*self.S
-                        h_end = h_start+self.pool_size
-                        w_start = w*self.S
-                        w_end = w_start+self.pool_size
-                        # Update gradients for the window and the filter's parameters
-                        x = inputs[n, k, h_start:h_end, w_start:w_end]
-                        dinputs[n,k, h_start:h_end, w_start:w_end] += ((x == np.max(x))
-                        * grads_wrt_outputs[n, k, h, w])
         return dinputs
 
     def __repr__(self):
@@ -715,11 +665,11 @@ class ConvolutionalLayer(LayerWithParameters):
         self.biases_penalty = biases_penalty
         self.P = pad
         self.S = stride
-        self.cache = None
+        self.cache = defaultdict(None)
 
     @jit
     def fprop(self, inputs):
-        """ Use convolve2d to Implement the convolution. No padding.
+        """ A fast implementation the convolution. No padding.
         Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
         corresponds to `y = conv2d(x, K) + b`.
@@ -730,26 +680,38 @@ class ConvolutionalLayer(LayerWithParameters):
             outputs: Array of layer outputs of shape
             (batch_size, num_output_channels, output_dim_1, output_dim_2).
         """
-         # Add padding to each image
-        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        #output_dim_1 = (self.input_dim_1 - self.kernel_dim_1+2*self.P)/self.S + 1
-        #output_dim_2 = (self.input_dim_2 - self.kernel_dim_2+2*self.P)/self.S + 1
+        # num_output_channels, num_input_channels, kernel_dim_1, kernel_dim_2 = kernels_shape
         (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        inputs_pad = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
+        input_dim_1 += 2*self.P
+        input_dim_2 += 2*self.P
+        output_dim_1 = (input_dim_1-self.kernel_dim_1) // self.S + 1
+        output_dim_2 = (input_dim_2-self.kernel_dim_2) // self.S + 1
+        shape = (num_input_channels, self.kernel_dim_1, self.kernel_dim_2, batch_size, output_dim_1, output_dim_2)
 
-        output = np.zeros((batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
-        for n in range(batch_size): # interate over samples in the batch_size
-            for k in range(self.num_output_channels): # iterate over kernels
-                for i in range(num_input_channels):
-                    output[n,k,...] += convolve2d(inputs[n,i,...], self.kernels[k,i,...], mode='valid')
-                output[n,k,...] += self.biases[k]
+        strides = (input_dim_1*input_dim_2, input_dim_2, 1, num_input_channels*input_dim_1*input_dim_2, self.S*input_dim_2, self.S)
+        strides = inputs.itemsize * np.array(strides)
+        inputs_stride = np.lib.stride_tricks.as_strided(inputs_pad, shape=shape, strides=strides)
+        inputs_col = np.ascontiguousarray(inputs_stride)
+        inputs_col.shape = (num_input_channels*self.kernel_dim_1*self.kernel_dim_2, batch_size*output_dim_1*output_dim_2)
 
-        assert(output.shape == (batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
-        return output
+        res = self.kernels.reshape(self.num_output_channels, -1) .dot(inputs_col) + self.biases.reshape(-1,1)
 
+        # Reshape the output
+        res.shape = (self.num_output_channels, batch_size, output_dim_1, output_dim_2)
+        out = res.transpose(1, 0, 2, 3)
+
+        #return a contiguous array
+        out = np.ascontiguousarray(out)
+        self.cache['inputs_col'] = inputs_col
+
+        return out
+
+    
     @jit
-    def fprop_naive(self, inputs):
-        """Forward propagates activations through the layer transformation.
+    def fprop_im2col(self, inputs):
+        """ A fast implementation the convolution based on image to col.
+        Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
         corresponds to `y = conv2d(x, K) + b`.
         Args:
@@ -759,33 +721,29 @@ class ConvolutionalLayer(LayerWithParameters):
             outputs: Array of layer outputs of shape
             (batch_size, num_output_channels, output_dim_1, output_dim_2).
         """
-         # Add padding to each image
-        inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        #output_dim_1 = (self.input_dim_1 - self.kernel_dim_1+2*self.P)/self.S + 1
-        #output_dim_2 = (self.input_dim_2 - self.kernel_dim_2+2*self.P)/self.S + 1
-        batch_size = inputs.shape[0]
+        # num_output_channels, num_input_channels, kernel_dim_1, kernel_dim_2 = kernels_shape
 
-        output = np.zeros((batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
-        for n in range(batch_size): # interate over samples in the batch_size
-            for k in range(self.num_output_channels): # iterate over kernels
-                for h in range(self.output_dim_1):
-                    for w in range(self.output_dim_2):
-                        h_start = h*self.S
-                        h_end = h_start+self.kernel_dim_1
-                        w_start = w*self.S
-                        w_end = w_start+self.kernel_dim_2
-                        output[n,k,h,w]= np.sum(inputs_pad[n, :, h_start:h_end, w_start:w_end]
-                        * self.kernels[k, ...]) + self.biases[k]
-                        #convolve2d( , self.kernels[k,...])
-        assert(output.shape == (batch_size, self.num_output_channels, self.output_dim_1, self.output_dim_2))
-        return output
+        (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        out = np.zeros((batch_size, self.num_output_channels, self.output_dim_1,
+        self.output_dim_2), dtype=inputs.dtype)
+
+        inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+
+        res = self.kernels.reshape((self.kernels.shape[0], -1)).dot(inputs_col) + self.biases.reshape(-1, 1)
+        out = res.reshape(self.kernels.shape[0], out.shape[2], out.shape[3], inputs.shape[0])
+
+        out = out.transpose(3, 0, 1, 2)
+        #print('debug')
+        self.cache['inputs_col'] = inputs_col
+
+        return out
+
+
 
     @jit
     def bprop(self, inputs, outputs, grads_wrt_outputs):
-        """Back propagates gradients through a layer.
-        Given gradients with respect to the outputs of the layer calculates the
-        gradients with respect to the layer inputs.
+        """A fast implementation of the backward pass for a convolutional layer
+        based on im2col and col2im.
         Args:
             inputs: Array of layer inputs of shape
                 (batch_size, num_input_channels, input_dim_1, input_dim_2).
@@ -799,78 +757,15 @@ class ConvolutionalLayer(LayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, num_input_channels, input_dim_1, input_dim_2).
         """
+
         (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
-        dinputs = np.zeros(inputs.shape)
-
-        # Pad the grads_wrt_outputs
-        grads_wrt_outputs_pad = np.pad(grads_wrt_outputs, ((0,),(0,),
-        (self.kernel_dim_1-1,), (self.kernel_dim_2-1,)),'constant')
-        #dinputs_pad = np.pad(dinputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        #inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        #dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-
-        kernels_flip = self.kernels[:, :, ::-1, ::-1]
-        for n in range(inputs.shape[0]):
-            for k in range(self.num_output_channels):
-                for i in range(num_input_channels):
-                    dinputs[n,i,...] += convolve2d(grads_wrt_outputs_pad[n, k, ...], kernels_flip[k,i,...], mode='valid')
-                    #dinputs[n,k,...] += convolve2d(inputs[n,i,...], self.kernels[k,i,...], mode='valid')
+        grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
+        dinputs_col = self.kernels.reshape(self.num_output_channels, -1).T.dot(grads_wrt_outputs_reshape)
+        dinputs = col2im_indices(dinputs_col, inputs.shape, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+        self.cache['grads_wrt_outputs_reshape']= grads_wrt_outputs_reshape
 
         return dinputs
 
-
-    @jit
-    def bprop_naive(self, inputs, outputs, grads_wrt_outputs):
-        """Back propagates gradients through a layer.
-        Given gradients with respect to the outputs of the layer calculates the
-        gradients with respect to the layer inputs.
-        Args:
-            inputs: Array of layer inputs of shape
-                (batch_size, num_input_channels, input_dim_1, input_dim_2).
-            outputs: Array of layer outputs calculated in forward pass of
-                shape
-                (batch_size, num_output_channels, output_dim_1, output_dim_2).
-            grads_wrt_outputs: Array of gradients with respect to the layer
-                outputs of shape
-                (batch_size, num_output_channels, output_dim_1, output_dim_2).
-        Returns:
-            Array of gradients with respect to the layer inputs of shape
-            (batch_size, num_input_channels, input_dim_1, input_dim_2).
-        """
-        #(batch_size, num_output_channels, output_dim_1, output_dim_2) = grads_wrt_outputs.shape
-        dinputs = np.zeros(inputs.shape)
-
-        # Pad the grads_wrt_outputs
-        dinputs_pad = np.pad(dinputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        inputs_pad = np.pad(inputs, ((0,0),(0,0), (self.P,self.P), (self.P,self.P)),'constant')
-        #dinputs_pad = np.pad(dinputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-        #inputs_pad = np.pad(inputs, ((0,), (0,), (self.P,), (self.P,)), 'constant')
-
-        #kernels_flip = self.kernels[:, :, ::-1, ::-1]
-        for n in range(inputs.shape[0]):
-            for k in range(self.num_output_channels):
-                for h in range(self.output_dim_1):
-                    for w in range(self.output_dim_2):
-                        # Use the corners to define the slice from inputs_pad
-                        h_start = h*self.S
-                        h_end = h_start+self.kernel_dim_1
-                        w_start = w*self.S
-                        w_end = w_start+self.kernel_dim_2
-                        a_slice = inputs_pad[n, :, h_start:h_end, w_start:w_end]
-                        # Update gradients for the window and the filter's parameters
-                        dinputs_pad[n,:, h_start:h_end, w_start:w_end] += (self.kernels[k,...]
-                        * grads_wrt_outputs[n, k, h, w])
-
-            # Unpaded
-            if self.P>0:
-                dinputs[n, :, :, :] = dinputs_pad[n,:,self.P:-self.P, self.P:-self.P]
-
-        assert(dinputs.shape == inputs.shape)
-        if self.P>0:
-            return dinputs
-        else:
-            return dinputs_pad
 
     @jit
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
@@ -884,23 +779,13 @@ class ConvolutionalLayer(LayerWithParameters):
             list of arrays of gradients with respect to the layer parameters
             `[grads_wrt_kernels, grads_wrt_biases]`.
         """
-        dkernels = np.zeros(self.kernels.shape)
-        dbiases = np.zeros(self.biases.shape)
-        for n in range(inputs.shape[0]):
-            for k in range(self.num_output_channels):
-                for h in range(self.output_dim_1):
-                    for w in range(self.output_dim_2):
-                        # Use the corners to define the slice from inputs_pad
-                        h_start = h*self.S
-                        h_end = h_start+self.kernel_dim_1
-                        w_start = w*self.S
-                        w_end = w_start+self.kernel_dim_2
-                        a_slice = inputs[n, :, h_start:h_end, w_start:w_end]
-                        # Update gradients for the window and the filter's parameters
-                        dkernels[k,...] += a_slice * grads_wrt_outputs[n, k, h, w]
-        dkernels = dkernels[:, :, ::-1, ::-1]
-        for k in range(self.num_output_channels):
-             dbiases[k] = np.sum(grads_wrt_outputs[:, k, :, :])
+        # To pass the test, calculate the data again
+        inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+        grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
+        #inputs_col = self.cache['inputs_col']
+        #grads_wrt_outputs_reshape = self.cache['grads_wrt_outputs_reshape']
+        dkernels = grads_wrt_outputs_reshape.dot(inputs_col.T).reshape(self.kernels.shape)
+        dbiases = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
 
         return [dkernels,dbiases]
 
