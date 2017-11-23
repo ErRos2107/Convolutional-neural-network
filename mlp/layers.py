@@ -678,33 +678,7 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return out
 
-    def im2col_indices(inputs):
-        """ An implementation of im2col based on some fancy indexing """
-        # Zero-pad the input
-        inputs_padded = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
-
-        k, i, j = get_im2col_indices(inputs.shape)
-
-        cols = x_padded[:, k, i, j]
-        C = x.shape[1]
-        cols = cols.transpose(1, 2, 0).reshape(self.kernel_dim_1 * self.kernel_dim_2 * C, -1)
-        return cols
-
-    def col2im_indices(cols, inputs_shape):
-        """ An implementation of col2im based on fancy indexing and np.add.at """
-        N, C, H, W = inputs_shape
-        H_padded, W_padded = H + 2 * self.P, W + 2 * self.P
-        x_padded = np.zeros((N, C, H_padded, W_padded), dtype=cols.dtype)
-        k, i, j = get_im2col_indices(inputs_shape)
-        cols_reshaped = cols.reshape(C * self.kernel_dim_1 * self.kernel_dim_2, -1, N)
-        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
-        np.add.at(x_padded, (slice(None), k, i, j), cols_reshaped)
-        if self.P == 0:
-            return x_padded
-        return x_padded[:, :, self.P:-self.P, self.P:-self.P]
-
-
-    def get_im2col_indices(inputs_shape):
+    def get_im2col_indices(self, inputs_shape):
         # First figure out what the size of the output should be
         N, C, H, W = inputs_shape
         assert (H + 2 * self.P - self.kernel_dim_1) % self.S == 0
@@ -724,6 +698,30 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return (k, i, j)
 
+    def im2col_indices(self, inputs):
+        """ An implementation of im2col based on some fancy indexing """
+        # Zero-pad the input
+        inputs_padded = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
+
+        k, i, j = self.get_im2col_indices(inputs.shape)
+
+        cols = inputs_padded[:, k, i, j]
+        C = inputs.shape[1]
+        cols = cols.transpose(1, 2, 0).reshape(self.kernel_dim_1 * self.kernel_dim_2 * C, -1)
+        return cols
+
+    def col2im_indices(self, cols, inputs_shape):
+        """ An implementation of col2im based on fancy indexing and np.add.at """
+        N, C, H, W = inputs_shape
+        H_padded, W_padded = H + 2 * self.P, W + 2 * self.P
+        x_padded = np.zeros((N, C, H_padded, W_padded), dtype=cols.dtype)
+        k, i, j = self.get_im2col_indices(inputs_shape)
+        cols_reshaped = cols.reshape(C * self.kernel_dim_1 * self.kernel_dim_2, -1, N)
+        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
+        np.add.at(x_padded, (slice(None), k, i, j), cols_reshaped)
+        if self.P == 0:
+            return x_padded
+        return x_padded[:, :, self.P:-self.P, self.P:-self.P]
 
     @jit
     def fprop_im2col(self, inputs):
@@ -744,7 +742,7 @@ class ConvolutionalLayer(LayerWithParameters):
         out = np.zeros((batch_size, self.num_output_channels, self.output_dim_1,
         self.output_dim_2), dtype=inputs.dtype)
 
-        inputs_col = im2col_indices(inputs)
+        inputs_col = self.im2col_indices(inputs)
 
         res = self.kernels.reshape((self.kernels.shape[0], -1)).dot(inputs_col) + self.biases.reshape(-1, 1)
         out = res.reshape(self.kernels.shape[0], out.shape[2], out.shape[3], inputs.shape[0])
@@ -779,7 +777,7 @@ class ConvolutionalLayer(LayerWithParameters):
         batch_size=inputs.shape[0]
         grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
         dinputs_col = self.kernels.reshape(self.num_output_channels, -1).T.dot(grads_wrt_outputs_reshape)
-        dinputs = col2im_indices(dinputs_col, inputs.shape)
+        dinputs = self.col2im_indices(dinputs_col, inputs.shape)
         self.cache['grads_wrt_outputs_reshape']= grads_wrt_outputs_reshape
 
         return dinputs
