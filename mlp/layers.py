@@ -678,6 +678,52 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return out
 
+    def im2col_indices(inputs):
+        """ An implementation of im2col based on some fancy indexing """
+        # Zero-pad the input
+        inputs_padded = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
+
+        k, i, j = get_im2col_indices(inputs.shape)
+
+        cols = x_padded[:, k, i, j]
+        C = x.shape[1]
+        cols = cols.transpose(1, 2, 0).reshape(self.kernel_dim_1 * self.kernel_dim_2 * C, -1)
+        return cols
+
+    def col2im_indices(cols, inputs_shape):
+        """ An implementation of col2im based on fancy indexing and np.add.at """
+        N, C, H, W = inputs_shape
+        H_padded, W_padded = H + 2 * self.P, W + 2 * self.P
+        x_padded = np.zeros((N, C, H_padded, W_padded), dtype=cols.dtype)
+        k, i, j = get_im2col_indices(inputs_shape)
+        cols_reshaped = cols.reshape(C * self.kernel_dim_1 * self.kernel_dim_2, -1, N)
+        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
+        np.add.at(x_padded, (slice(None), k, i, j), cols_reshaped)
+        if self.P == 0:
+            return x_padded
+        return x_padded[:, :, self.P:-self.P, self.P:-self.P]
+
+
+    def get_im2col_indices(inputs_shape):
+        # First figure out what the size of the output should be
+        N, C, H, W = inputs_shape
+        assert (H + 2 * self.P - self.kernel_dim_1) % self.S == 0
+        assert (W + 2 * self.P - self.kernel_dim_1) % self.S == 0
+        out_height = (H + 2 * self.P - self.kernel_dim_1) // self.S + 1
+        out_width = (W + 2 * self.P - self.kernel_dim_2) // self.S + 1
+
+        i0 = np.repeat(np.arange(self.kernel_dim_1), self.kernel_dim_2)
+        i0 = np.tile(i0, C)
+        i1 = self.S * np.repeat(np.arange(out_height), out_width)
+        j0 = np.tile(np.arange(self.kernel_dim_2), self.kernel_dim_1 * C)
+        j1 = self.S * np.tile(np.arange(out_width), out_height)
+        i = i0.reshape(-1, 1) + i1.reshape(1, -1)
+        j = j0.reshape(-1, 1) + j1.reshape(1, -1)
+
+        k = np.repeat(np.arange(C), self.kernel_dim_1 * self.kernel_dim_2).reshape(-1, 1)
+
+        return (k, i, j)
+
 
     @jit
     def fprop_im2col(self, inputs):
@@ -738,51 +784,6 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return dinputs
 
-    def im2col_indices(inputs):
-        """ An implementation of im2col based on some fancy indexing """
-        # Zero-pad the input
-        inputs_padded = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
-
-        k, i, j = get_im2col_indices(inputs.shape)
-
-        cols = x_padded[:, k, i, j]
-        C = x.shape[1]
-        cols = cols.transpose(1, 2, 0).reshape(self.kernel_dim_1 * self.kernel_dim_2 * C, -1)
-        return cols
-
-    def col2im_indices(cols, inputs_shape):
-        """ An implementation of col2im based on fancy indexing and np.add.at """
-        N, C, H, W = inputs_shape
-        H_padded, W_padded = H + 2 * self.P, W + 2 * self.P
-        x_padded = np.zeros((N, C, H_padded, W_padded), dtype=cols.dtype)
-        k, i, j = get_im2col_indices(inputs_shape)
-        cols_reshaped = cols.reshape(C * self.kernel_dim_1 * self.kernel_dim_2, -1, N)
-        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
-        np.add.at(x_padded, (slice(None), k, i, j), cols_reshaped)
-        if self.P == 0:
-            return x_padded
-        return x_padded[:, :, self.P:-self.P, self.P:-self.P]
-
-
-    def get_im2col_indices(inputs_shape):
-        # First figure out what the size of the output should be
-        N, C, H, W = inputs_shape
-        assert (H + 2 * self.P - self.kernel_dim_1) % self.S == 0
-        assert (W + 2 * self.P - self.kernel_dim_1) % self.S == 0
-        out_height = (H + 2 * self.P - self.kernel_dim_1) // self.S + 1
-        out_width = (W + 2 * self.P - self.kernel_dim_2) // self.S + 1
-
-        i0 = np.repeat(np.arange(self.kernel_dim_1), self.kernel_dim_2)
-        i0 = np.tile(i0, C)
-        i1 = self.S * np.repeat(np.arange(out_height), out_width)
-        j0 = np.tile(np.arange(self.kernel_dim_2), self.kernel_dim_1 * C)
-        j1 = self.S * np.tile(np.arange(out_width), out_height)
-        i = i0.reshape(-1, 1) + i1.reshape(1, -1)
-        j = j0.reshape(-1, 1) + j1.reshape(1, -1)
-
-        k = np.repeat(np.arange(C), self.kernel_dim_1 * self.kernel_dim_2).reshape(-1, 1)
-
-        return (k, i, j)
 
     @jit
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
