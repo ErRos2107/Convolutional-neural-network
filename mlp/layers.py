@@ -17,7 +17,7 @@ import mlp.initialisers as init
 from mlp import DEFAULT_SEED
 from numba import jit
 from scipy.signal import convolve2d
-from mlp.im2col import get_im2col_indices, im2col_indices, col2im_indices
+#from mlp.im2col import get_im2col_indices, im2col_indices, col2im_indices
 from collections import defaultdict
 
 class Layer(object):
@@ -651,19 +651,20 @@ class ConvolutionalLayer(LayerWithParameters):
             (batch_size, num_output_channels, output_dim_1, output_dim_2).
         """
         # num_output_channels, num_input_channels, kernel_dim_1, kernel_dim_2 = kernels_shape
-        (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        #(batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        batch_size=inputs.shape[0]
         inputs_pad = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
-        input_dim_1 += 2*self.P
-        input_dim_2 += 2*self.P
+        input_dim_1 = self.input_dim_1 +2*self.P
+        input_dim_2 = self.input_dim_2 +2*self.P
         output_dim_1 = (input_dim_1-self.kernel_dim_1) // self.S + 1
         output_dim_2 = (input_dim_2-self.kernel_dim_2) // self.S + 1
-        shape = (num_input_channels, self.kernel_dim_1, self.kernel_dim_2, batch_size, output_dim_1, output_dim_2)
+        shape = (self.num_input_channels, self.kernel_dim_1, self.kernel_dim_2, batch_size, output_dim_1, output_dim_2)
 
-        strides = (input_dim_1*input_dim_2, input_dim_2, 1, num_input_channels*input_dim_1*input_dim_2, self.S*input_dim_2, self.S)
+        strides = (input_dim_1*input_dim_2, input_dim_2, 1, self.num_input_channels*input_dim_1*input_dim_2, self.S*input_dim_2, self.S)
         strides = inputs.itemsize * np.array(strides)
         inputs_stride = np.lib.stride_tricks.as_strided(inputs_pad, shape=shape, strides=strides)
         inputs_col = np.ascontiguousarray(inputs_stride)
-        inputs_col.shape = (num_input_channels*self.kernel_dim_1*self.kernel_dim_2, batch_size*output_dim_1*output_dim_2)
+        inputs_col.shape = (self.num_input_channels*self.kernel_dim_1*self.kernel_dim_2, batch_size*output_dim_1*output_dim_2)
 
         res = self.kernels.reshape(self.num_output_channels, -1) .dot(inputs_col) + self.biases.reshape(-1,1)
 
@@ -697,7 +698,7 @@ class ConvolutionalLayer(LayerWithParameters):
         out = np.zeros((batch_size, self.num_output_channels, self.output_dim_1,
         self.output_dim_2), dtype=inputs.dtype)
 
-        inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+        inputs_col = im2col_indices(inputs)
 
         res = self.kernels.reshape((self.kernels.shape[0], -1)).dot(inputs_col) + self.biases.reshape(-1, 1)
         out = res.reshape(self.kernels.shape[0], out.shape[2], out.shape[3], inputs.shape[0])
@@ -728,14 +729,60 @@ class ConvolutionalLayer(LayerWithParameters):
             (batch_size, num_input_channels, input_dim_1, input_dim_2).
         """
 
-        (batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        #(batch_size, num_input_channels, input_dim_1, input_dim_2) = inputs.shape
+        batch_size=inputs.shape[0]
         grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
         dinputs_col = self.kernels.reshape(self.num_output_channels, -1).T.dot(grads_wrt_outputs_reshape)
-        dinputs = col2im_indices(dinputs_col, inputs.shape, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
+        dinputs = col2im_indices(dinputs_col, inputs.shape)
         self.cache['grads_wrt_outputs_reshape']= grads_wrt_outputs_reshape
 
         return dinputs
 
+def im2col_indices(inputs):
+        """ An implementation of im2col based on some fancy indexing """
+        # Zero-pad the input
+        inputs_padded = np.pad(inputs, ((0, ), (0, ), (self.P, ), (self.P, )), mode='constant')
+
+        k, i, j = get_im2col_indices(inputs.shape)
+
+        cols = x_padded[:, k, i, j]
+        C = x.shape[1]
+        cols = cols.transpose(1, 2, 0).reshape(self.kernel_dim_1 * self.kernel_dim_2 * C, -1)
+        return cols
+
+def col2im_indices(cols, inputs_shape):
+        """ An implementation of col2im based on fancy indexing and np.add.at """
+        N, C, H, W = inputs_shape
+        H_padded, W_padded = H + 2 * self.P, W + 2 * self.P
+        x_padded = np.zeros((N, C, H_padded, W_padded), dtype=cols.dtype)
+        k, i, j = get_im2col_indices(inputs_shape)
+        cols_reshaped = cols.reshape(C * self.kernel_dim_1 * self.kernel_dim_2, -1, N)
+        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
+        np.add.at(x_padded, (slice(None), k, i, j), cols_reshaped)
+        if self.P == 0:
+            return x_padded
+        return x_padded[:, :, self.P:-self.P, self.P:-self.P]
+
+
+def get_im2col_indices(inputs_shape):
+        # First figure out what the size of the output should be
+        N, C, H, W = inputs_shape
+        assert (H + 2 * self.P - self.kernel_dim_1) % self.S == 0
+        assert (W + 2 * self.P - self.kernel_dim_1) % self.S == 0
+        out_height = (H + 2 * self.P - self.kernel_dim_1) // self.S + 1
+        out_width = (W + 2 * self.P - self.kernel_dim_2) // self.S + 1
+
+        i0 = np.repeat(np.arange(self.kernel_dim_1), self.kernel_dim_2)
+        i0 = np.tile(i0, C)
+        i1 = self.S * np.repeat(np.arange(out_height), out_width)
+        j0 = np.tile(np.arange(self.kernel_dim_2), self.kernel_dim_1 * C)
+        j1 = self.S * np.tile(np.arange(out_width), out_height)
+        i = i0.reshape(-1, 1) + i1.reshape(1, -1)
+        j = j0.reshape(-1, 1) + j1.reshape(1, -1)
+
+        k = np.repeat(np.arange(C), self.kernel_dim_1 * self.kernel_dim_2).reshape(-1, 1)
+
+        return (k, i, j)
 
     @jit
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
@@ -759,37 +806,7 @@ class ConvolutionalLayer(LayerWithParameters):
 
         return [dkernels,dbiases]
 
-    @jit
-    def grads_wrt_params_naive(self, inputs, grads_wrt_outputs):
-        """Calculates gradients with respect to layer parameters.
-        Args:
-            inputs: array of inputs to layer of shape (batch_size, input_dim)
-            grads_wrt_to_outputs: array of gradients with respect to the layer
-                outputs of shape
-                (batch_size, num_output-_channels, output_dim_1, output_dim_2).
-        Returns:
-            list of arrays of gradients with respect to the layer parameters
-            `[grads_wrt_kernels, grads_wrt_biases]`.
-        """
-        dkernels = np.zeros(self.kernels.shape)
-        dbiases = np.zeros(self.biases.shape)
-        for n in range(inputs.shape[0]):
-            for k in range(self.num_output_channels):
-                for h in range(self.output_dim_1):
-                    for w in range(self.output_dim_2):
-                        # Use the corners to define the slice from inputs_pad
-                        h_start = h*self.S
-                        h_end = h_start+self.kernel_dim_1
-                        w_start = w*self.S
-                        w_end = w_start+self.kernel_dim_2
-                        a_slice = inputs[n, :, h_start:h_end, w_start:w_end]
-                        # Update gradients for the window and the filter's parameters
-                        dkernels[k,...] += a_slice * grads_wrt_outputs[n, k, h, w]
 
-        for k in range(self.num_output_channels):
-             dbiases[k] = np.sum(grads_wrt_outputs[:, k, :, :])
-
-        return [dkernels,dbiases]
 
     def params_penalty(self):
         """Returns the parameter dependent penalty term for this layer.
