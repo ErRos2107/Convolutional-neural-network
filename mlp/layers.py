@@ -638,7 +638,7 @@ class ConvolutionalLayer(LayerWithParameters):
         self.cache = defaultdict(None)
 
     @jit
-    def fprop(self, inputs):
+    def fprop_stride(self, inputs):
         """ A fast implementation the convolution. No padding.
         Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
@@ -724,7 +724,7 @@ class ConvolutionalLayer(LayerWithParameters):
         return x_padded[:, :, self.P:-self.P, self.P:-self.P]
 
     @jit
-    def fprop_im2col(self, inputs):
+    def fprop(self, inputs):
         """ A fast implementation the convolution based on image to col.
         Forward propagates activations through the layer transformation.
         For inputs `x`, outputs `y`, kernels `K` and biases `b` the layer
@@ -796,8 +796,8 @@ class ConvolutionalLayer(LayerWithParameters):
             `[grads_wrt_kernels, grads_wrt_biases]`.
         """
         # To pass the test, calculate the data again
-        #inputs_col = im2col_indices(inputs, self.kernel_dim_1, self.kernel_dim_2, self.P, self.S)
-        #grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
+        # inputs_col = self.im2col_indices(inputs)
+        # grads_wrt_outputs_reshape = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(self.num_output_channels, -1)
         inputs_col = self.cache['inputs_col']
         grads_wrt_outputs_reshape = self.cache['grads_wrt_outputs_reshape']
         dkernels = grads_wrt_outputs_reshape.dot(inputs_col.T).reshape(self.kernels.shape)
