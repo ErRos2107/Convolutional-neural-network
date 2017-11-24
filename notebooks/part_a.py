@@ -12,8 +12,7 @@ import logging
 from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 from collections import defaultdict
 from mlp.penalty import L1Penalty, L2Penalty
-
-%matplotlib inline
+print('         Stride     !!!!')
 plt.style.use('ggplot')
 
 def train_model_and_plot_stats(
@@ -124,7 +123,7 @@ learning_rule = GradientDescentLearningRule(learning_rate=learning_rate)
 experiment = 'Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -159,7 +158,7 @@ for experiment, penalty in zip(['Relu_L2Penal_1e-4_x2','Relu_L2Penal_1e-3_x2'], 
     learning_rule = GradientDescentLearningRule(learning_rate=learning_rate)
 
     stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
     fig_1.savefig(experiment +'_error.pdf'.format(penalty))
     fig_2.savefig(experiment +'_accuracy.pdf'.format(penalty))
 
@@ -203,7 +202,7 @@ learning_rule = GradientDescentLearningRule(learning_rate=learning_rate)
 experiment = 'Drop_relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -248,7 +247,7 @@ learning_rule = GradientDescentLearningRule(learning_rate=learning_rate)
 experiment = 'Drop_relu_2xhidden_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -289,7 +288,7 @@ for mom_coeff, experiment in zip([0.9, 0.95], ['Dropout_mom_0.9', 'Dropout_mom_0
 
     #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
     stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
     fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
     fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -335,7 +334,7 @@ learning_rule = MomentumLearningRule(learning_rate=learning_rate, mom_coeff=mom_
 experiment = 'Drop_relu_2xhidden_mom_'+str(mom_coeff)+'_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -412,7 +411,7 @@ learning_rule = RMSPropLearningRule(learning_rate=learning_rate,)
 experiment = 'RMSProp_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -446,7 +445,7 @@ learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 experiment = 'Adam_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -493,7 +492,7 @@ fig_1.savefig('Error_learning_rule.pdf',bbox_inches = "tight")
 fig_2.savefig('Accuracy_learning_rule.pdf',bbox_inches = "tight" )
 
 ######################################################################################################
-# Batch normalisation
+# Batch normalisation before Relu
 ######################################################################################################
 rng.seed(seed)
 
@@ -522,7 +521,45 @@ learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 experiment = 'BatchNorm_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
+fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
+fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
+
+save_and_present(experiment, stats, learning_rate)
+
+save_stats[experiment] = stats
+
+######################################################################################################
+# Batch normalisation after relu
+######################################################################################################
+rng.seed(seed)
+
+#setup hyperparameters
+learning_rate = 0.005
+num_epochs = 100
+stats_interval = 1
+input_dim, output_dim, hidden_dim = 784, 47, 256
+
+weights_init = GlorotUniformInit(rng=rng)
+biases_init = ConstantInit(0.)
+model = MultipleLayerModel([
+    AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
+    ReluLayer(),
+    BatchNormalizationLayer(hidden_dim),
+    AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+    ReluLayer(),
+    BatchNormalizationLayer(hidden_dim),
+    AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
+])
+
+error = CrossEntropySoftmaxError()
+# Use a basic gradient descent learning rule
+learning_rule = AdamLearningRule(learning_rate=learning_rate,)
+
+experiment = 'Relu_BatchNorm_x2'
+
+stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -569,7 +606,7 @@ learning_rule = AdamLearningRule(learning_rate=learning_rate, beta1=mom_coeff)
 experiment = 'BatchNorm_drop_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
@@ -640,7 +677,7 @@ learning_rule = AdamLearningRule(learning_rate=learning_rate, beta1=mom_coeff)
 experiment = 'BatchNorm_Relu_drop_x8'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
