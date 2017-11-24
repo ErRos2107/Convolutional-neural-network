@@ -325,7 +325,7 @@ class AdamLearningRule(GradientDescentLearningRule):
                 with respect to each of the parameters passed to `initialise`
                 previously, with this list expected to be in the same order.
         """
-        self.iteration += 1
+        #self.iteration += 1
         for param, mom, s, grad in zip(self.params, self.moms, self.rms, grads_wrt_params):
             # s = beta*s+(1-beta)dw^2
             mom += (self.beta1-1)*mom + (1-self.beta1)* grad
@@ -333,6 +333,6 @@ class AdamLearningRule(GradientDescentLearningRule):
             #s *= self.beta
             #s += (1-beta)* grad**2
 			# bias-correction
-            mom = mom / ( 1 - self.beta2**self.iteration)
-            s = s / ( 1 - self.beta2**self.iteration)
+            #mom = mom / ( 1 - self.beta1**self.iteration)
+            #s = s / ( 1 - self.beta2**self.iteration)
             param -= self.learning_rate*mom/(np.sqrt(s)+self.epsilon)
