@@ -109,7 +109,7 @@ rng.seed(seed)
 #valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 0.01
+learning_rate = 5e-3
 num_epochs = 30
 stats_interval = 1
 
@@ -150,7 +150,7 @@ error = CrossEntropySoftmaxError()
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
 
-experiment = 'Con_pool_BN_x2'
+experiment = 'Con_pool_BN_relu_x2'
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)

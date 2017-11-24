@@ -365,9 +365,8 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-
-	for k in ['acc(train)', 'acc(valid)']:
-		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
+    for k in ['acc(train)', 'acc(valid)']:
+        ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
 
 ax_1.legend(bbox_to_anchor=(1., 1), loc=0, borderaxespad=0.)
@@ -478,9 +477,8 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-
-	for k in ['acc(train)', 'acc(valid)']:
-		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
+    for k in ['acc(train)', 'acc(valid)']:
+        ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
 
 ax_1.legend(bbox_to_anchor=(1., 1), loc=0, borderaxespad=0.)
@@ -650,9 +648,8 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-
-	for k in ['acc(train)', 'acc(valid)']:
-		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
+    for k in ['acc(train)', 'acc(valid)']:
+        ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
 
 

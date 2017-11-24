@@ -11,6 +11,12 @@ from mlp.initialisers import ConstantInit, GlorotUniformInit
 from mlp.learning_rules import GradientDescentLearningRule
 from mlp.learning_rules import RMSPropLearningRule,AdamLearningRule
 from mlp.optimisers import Optimiser
+import matplotlib.pyplot as plt
+import numpy as np
+import logging
+from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
+from collections import defaultdict
+from mlp.penalty import L1Penalty, L2Penalty
 
 
 def train_model_and_plot_stats(
@@ -49,8 +55,8 @@ def train_model_and_plot_stats(
     return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 
 # save and present the data
-save_stats= {}
-def save_and_present(experiment, stats):
+save_stats= defaultdict()
+def save_and_present(experiment, stats, parameter):
 
     np.savetxt(experiment +'.csv', stats, delimiter=',')
 
@@ -58,13 +64,20 @@ def save_and_present(experiment, stats):
     error_train= stats[1:, keys['error(train)']]
     acc_valid = stats[1:, keys['acc(valid)']]
 
-    file = open(experiment+'.txt','w')
+    file = open(experiment+'_'+str(parameter)+'.txt','w')
+
     overfitting = error_valid-error_train
-    file.write('Experiment '+experiment+' best acc at Epoch={} by learning_rate={}\n'.
-          format(np.argmax(acc_valid)+1,learning_rate))
+    file.write('Experiment '+experiment+' best acc at Epoch={} by parameter={}\n'.
+          format(np.argmax(acc_valid)+1, parameter))
     file.write('error(train)= {}, error(valid)={}, \n error gap = {},  acc(valid)={}\n'.
           format(error_train[np.argmax(acc_valid)],error_valid[np.argmax(acc_valid)],overfitting[np.argmax(acc_valid)], max(acc_valid)))
     file.write('Smallest error gap(after best acc epoch) = {} at Epoch={}'.
+          format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
+    print('Experiment '+experiment+' best acc at Epoch={} by parameter={}\n'.
+          format(np.argmax(acc_valid)+1, parameter))
+    print('error(train)= {}, error(valid)={}, \n error gap = {},  acc(valid)={}\n'.
+          format(error_train[np.argmax(acc_valid)],error_valid[np.argmax(acc_valid)],overfitting[np.argmax(acc_valid)], max(acc_valid)))
+    print('Smallest error gap(after best acc epoch) = {} at Epoch={}'.
           format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
 
 print('Start strides!!!\n')
@@ -74,9 +87,6 @@ print('Start strides!!!\n')
 # will probably not want to reload the data providers on
 # every training run. If you wish to reset their state you
 # should instead use the .reset() method of the data providers.
-
-import logging
-from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 
 # Seed a random number generator
 seed = 10102016 
@@ -136,11 +146,11 @@ experiment = 'Con_pool_x1'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
-fig_1.savefig('error_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
-fig_2.savefig('accuracy_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
+fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
+fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
-save_and_present(experiment, stats)
+save_and_present(experiment, stats, learning_rate)
 
 save_stats[experiment] = stats
 

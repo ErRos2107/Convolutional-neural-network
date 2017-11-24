@@ -109,8 +109,8 @@ rng.seed(seed)
 #valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 5e-3
-num_epochs = 10
+learning_rate = 1e-3
+num_epochs = 30
 stats_interval = 1
 
 pad=0
