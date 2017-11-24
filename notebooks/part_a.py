@@ -16,7 +16,7 @@ print('         Stride     !!!!')
 plt.style.use('ggplot')
 
 def train_model_and_plot_stats(
-        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True):
+        model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False):
 
     # As well as monitoring the error over training also monitor classification
     # accuracy i.e. proportion of most-probable predicted classes being equal to targets
@@ -365,7 +365,7 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-        
+
 	for k in ['acc(train)', 'acc(valid)']:
 		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
@@ -426,7 +426,7 @@ save_stats[experiment] = stats
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 0.000075
+learning_rate = 7.5e-5
 num_epochs = 100
 stats_interval = 1
 input_dim, output_dim, hidden_dim = 784, 47, 256
@@ -462,7 +462,6 @@ font = {'family' : 'normal',
         'weight' : 'normal',
         'size'   : 15}
 plt.rc('font', **font)
-######################################################################################################
 color = ['b', 'yellow', 'g', 'r', 'y', 'm', 'gray',]
 experiments = ['Relu_x2', 'RMSProp_Relu_x2', 'Adam_Relu_x2']
 
@@ -479,7 +478,7 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-        
+
 	for k in ['acc(train)', 'acc(valid)']:
 		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
@@ -501,7 +500,7 @@ fig_2.savefig('Accuracy_learning_rule.pdf',bbox_inches = "tight" )
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 0.005
+learning_rate = 1e-3
 num_epochs = 100
 stats_interval = 1
 input_dim, output_dim, hidden_dim = 784, 47, 256
@@ -522,7 +521,7 @@ error = CrossEntropySoftmaxError()
 # Use a basic gradient descent learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'BatchNorm_Relu_x2'
+experiment = 'BatchNorm_before_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
@@ -539,7 +538,7 @@ save_stats[experiment] = stats
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 0.005
+learning_rate = 1e-3
 num_epochs = 100
 stats_interval = 1
 input_dim, output_dim, hidden_dim = 784, 47, 256
@@ -560,7 +559,7 @@ error = CrossEntropySoftmaxError()
 # Use a basic gradient descent learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'Relu_BatchNorm_x2'
+experiment = 'BatchNorm_after_Relu_x2'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
@@ -571,103 +570,37 @@ save_and_present(experiment, stats, learning_rate)
 
 save_stats[experiment] = stats
 
+
 ######################################################################################################
-# Batch normalisation with Dropout
-######################################################################################################
-rng.seed(seed)
-
-#setup hyperparameters
-learning_rate = 0.005
-num_epochs = 100
-stats_interval = 1
-input_dim, output_dim, hidden_dim = 784, 47, 256
-##########################################################
-# Use p = 0.5 in hidden layers and 0.8 in the input layer.
-incl_prob_0 =0.8
-incl_prob = 0.5
-# n/p
-hidden_dim = int(hidden_dim/incl_prob)
-mom_coeff = 0.99
-##########################################################
-weights_init = GlorotUniformInit(rng=rng)
-biases_init = ConstantInit(0.)
-model = MultipleLayerModel([
-    AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
-    BatchNormalizationLayer(hidden_dim),
-    ReluLayer(),
-    DropoutLayer(rng, incl_prob),
-    AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
-    BatchNormalizationLayer(hidden_dim),
-    ReluLayer(),
-    DropoutLayer(rng, incl_prob),
-    AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
-])
-
-error = CrossEntropySoftmaxError()
-# Use a basic gradient descent learning rule
-learning_rule = AdamLearningRule(learning_rate=learning_rate, beta1=mom_coeff)
-
-experiment = 'BatchNorm_drop_Relu_x2'
-
-stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
-fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
-fig_2.savefig(experiment+'_learning_rate_{}_accuracy.pdf'.format(learning_rate))
-
-save_and_present(experiment, stats, learning_rate)
-
-save_stats[experiment] = stats
-######################################################################################################
-# Batch normalisation with Dropout and deeper DNNs
+# Batch normalisation with deeper DNNs
 ######################################################################################################
 # to ensure reproducibility of results
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 0.005
+learning_rate = 0.01
 num_epochs = 100
 stats_interval = 1
 input_dim, output_dim, hidden_dim = 784, 47, 256
-##########################################################
-# Use p = 0.5 in hidden layers and 0.8 in the input layer.
-incl_prob_0 =0.8
-incl_prob = 0.5
-# n/p
-hidden_dim = int(hidden_dim/incl_prob)
-mom_coeff = 0.95
-##########################################################
+
 weights_init = GlorotUniformInit(rng=rng)
 biases_init = ConstantInit(0.)
 model = MultipleLayerModel([
     AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
-    DropoutLayer(rng, incl_prob),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
-    DropoutLayer(rng, incl_prob),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
-    DropoutLayer(rng, incl_prob),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
-    DropoutLayer(rng, incl_prob),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
-    DropoutLayer(rng, incl_prob),
-    AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
-    BatchNormalizationLayer(hidden_dim),
-    ReluLayer(),
-    DropoutLayer(rng, incl_prob),
-    DropoutLayer(rng, incl_prob),
-    AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
-    BatchNormalizationLayer(hidden_dim),
-    ReluLayer(),
-    DropoutLayer(rng, incl_prob),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
     BatchNormalizationLayer(hidden_dim),
     ReluLayer(),
@@ -678,7 +611,7 @@ error = CrossEntropySoftmaxError()
 # Use a basic gradient descent learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate, beta1=mom_coeff)
 
-experiment = 'BatchNorm_Relu_drop_x8'
+experiment = 'BatchNorm_Relu_x8'
 
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
@@ -717,7 +650,7 @@ for i, experiment in enumerate(experiments):
     for k in ['error(train)', 'error(valid)']:
         ax_1.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
-        
+
 	for k in ['acc(train)', 'acc(valid)']:
 		ax_2.plot(np.arange(1, s.shape[0]) * stats_interval,
               s[1:, keys[k]], label=str(experiments[i]+' '+k), linewidth=0.8)
