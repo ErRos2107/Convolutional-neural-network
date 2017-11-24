@@ -98,8 +98,8 @@ rng.seed(seed)
 #valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 0.001
-num_epochs = 100
+learning_rate = 1e-3
+num_epochs = 30
 stats_interval = 1
 
 pad=0
