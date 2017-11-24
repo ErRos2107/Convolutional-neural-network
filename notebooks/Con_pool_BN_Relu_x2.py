@@ -140,8 +140,8 @@ model = MultipleLayerModel([
     ConvolutionalLayer(num_output_channels1, num_output_channels2, Max_out_1, Max_out_1, kernel_dim_1, kernel_dim_2),
     MaxPoolingLayer(),
     ReshapeLayer(),
-    ReluLayer(),
     BatchNormalizationLayer(hidden_dim),
+    ReluLayer(),
     AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
 ])
 
@@ -150,12 +150,12 @@ error = CrossEntropySoftmaxError()
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
 
-experiment = 'Con_pool_relu_BN_x2'
+experiment = 'Con_pool_BN_x2'
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
-fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.pdf'.format(learning_rate))
-fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.pdf'.format(learning_rate))
+fig_1.savefig('error_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
+fig_2.savefig('accuracy_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
 
 save_and_present(experiment, stats, learning_rate)
 
