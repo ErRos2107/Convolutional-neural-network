@@ -80,7 +80,7 @@ def save_and_present(experiment, stats, parameter):
           format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
 
 ################################################################################
-print(' Strides  !!!\n')
+
 # The below code will set up the data providers, random number
 # generator and logger objects needed for training runs. As
 # loading the data from file take a little while you generally
@@ -109,8 +109,8 @@ rng.seed(seed)
 #valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 1e-2
-num_epochs = 30
+learning_rate = 1e-3
+num_epochs = 50
 stats_interval = 1
 
 pad=0
