@@ -109,7 +109,7 @@ rng.seed(seed)
 #valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 5e-3
+learning_rate = 1e-2
 num_epochs = 30
 stats_interval = 1
 
@@ -154,8 +154,8 @@ experiment = 'Con_pool_BN_relu_x2'
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
-fig_1.savefig('error_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
-fig_2.savefig('accuracy_'+ experiment +'_learning_rate_{}.pdf'.format(learning_rate))
+fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
+fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
 save_and_present(experiment, stats, learning_rate)
 
