@@ -9,9 +9,12 @@ from mlp.errors import CrossEntropySoftmaxError
 from mlp.models import MultipleLayerModel
 from mlp.initialisers import ConstantInit, GlorotUniformInit
 from mlp.learning_rules import GradientDescentLearningRule
-from mlp.learning_rules import RMSPropLearningRule,AdamLearningRule
+from mlp.learning_rules import RMSPropLearningRule, AdamLearningRule
 from mlp.optimisers import Optimiser
-
+from mlp.penalty import L1Penalty, L2Penalty
+from collections import defaultdict
+import logging
+from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 
 def train_model_and_plot_stats(
         model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False):
@@ -48,8 +51,9 @@ def train_model_and_plot_stats(
     
     return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 
+################################################################################
 # save and present the data
-save_stats= {}
+save_stats= defaultdict()
 def save_and_present(experiment, stats, parameter):
 
     np.savetxt(experiment +'.csv', stats, delimiter=',')
@@ -58,25 +62,30 @@ def save_and_present(experiment, stats, parameter):
     error_train= stats[1:, keys['error(train)']]
     acc_valid = stats[1:, keys['acc(valid)']]
 
-    file = open(experiment+'.txt','w')
+    file = open(experiment+'_'+str(parameter)+'.txt','w')
+
     overfitting = error_valid-error_train
     file.write('Experiment '+experiment+' best acc at Epoch={} by parameter={}\n'.
-          format(np.argmax(acc_valid)+1,parameter))
+          format(np.argmax(acc_valid)+1, parameter))
     file.write('error(train)= {}, error(valid)={}, \n error gap = {},  acc(valid)={}\n'.
           format(error_train[np.argmax(acc_valid)],error_valid[np.argmax(acc_valid)],overfitting[np.argmax(acc_valid)], max(acc_valid)))
     file.write('Smallest error gap(after best acc epoch) = {} at Epoch={}'.
           format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
+    print('Experiment '+experiment+' best acc at Epoch={} by parameter={}\n'.
+          format(np.argmax(acc_valid)+1, parameter))
+    print('error(train)= {}, error(valid)={}, \n error gap = {},  acc(valid)={}\n'.
+          format(error_train[np.argmax(acc_valid)],error_valid[np.argmax(acc_valid)],overfitting[np.argmax(acc_valid)], max(acc_valid)))
+    print('Smallest error gap(after best acc epoch) = {} at Epoch={}'.
+          format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
 
-print('Start strides!!!\n')
+################################################################################
+
 # The below code will set up the data providers, random number
 # generator and logger objects needed for training runs. As
 # loading the data from file take a little while you generally
 # will probably not want to reload the data providers on
 # every training run. If you wish to reset their state you
 # should instead use the .reset() method of the data providers.
-
-import logging
-from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 
 # Seed a random number generator
 seed = 10102016 
@@ -94,12 +103,10 @@ valid_data = EMNISTDataProvider('valid', batch_size=batch_size, rng=rng)
 ####################################################################################################################################################
 # to ensure reproducibility of results
 rng.seed(seed)
-#train_data.reset()
-#valid_data.reset()
 
 #setup hyperparameters
-learning_rate = 0.001
-num_epochs = 30
+learning_rate = 1e-3
+num_epochs = 50
 stats_interval = 1
 
 pad=0
@@ -136,6 +143,7 @@ biases_init = ConstantInit(0.)
 
 model = MultipleLayerModel([
     ReshapeLayer((num_input_channels,input_dim_1,input_dim_2)),
+
     ConvolutionalLayer(num_input_channels, num_output_channels1, input_dim_1, input_dim_2, kernel_dim_1, kernel_dim_2),
     ReshapeLayer(), 
     ReluLayer(),
@@ -145,8 +153,10 @@ model = MultipleLayerModel([
     ConvolutionalLayer(num_output_channels1, num_output_channels2, Max_out_1, Max_out_1, kernel_dim_1, kernel_dim_2),
     ReshapeLayer(), 
     ReluLayer(),
+	ReshapeLayer((num_output_channels2, Con_out_2, Con_out_2)),
     MaxPoolingLayer(),
-    ReshapeLayer(), 
+    
+	ReshapeLayer(), 
     ReluLayer(),
     AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
 ])
@@ -160,8 +170,8 @@ experiment = 'Con_relu_pool_x2'
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
-fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.pdf'.format(learning_rate))
-fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.pdf'.format(learning_rate))
+fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
+fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
 save_and_present(experiment, stats, learning_rate)
 
