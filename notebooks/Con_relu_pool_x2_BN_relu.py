@@ -105,7 +105,7 @@ valid_data = EMNISTDataProvider('valid', batch_size=batch_size, rng=rng)
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 1e-4
+learning_rate = 1e-2
 num_epochs = 50
 stats_interval = 1
 
@@ -157,8 +157,8 @@ model = MultipleLayerModel([
     MaxPoolingLayer(),
     
 	ReshapeLayer(), 
-    ReluLayer(),
 	BatchNormalizationLayer(hidden_dim),
+	ReluLayer(),
     AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
 ])
 
@@ -166,7 +166,7 @@ error = CrossEntropySoftmaxError()
 # learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'Con_relu_pool_x2_BN'
+experiment = 'Con_relu_pool_x2_BN_Relu'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
