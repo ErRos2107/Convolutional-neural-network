@@ -80,14 +80,13 @@ def save_and_present(experiment, stats, parameter):
           format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
 
 ################################################################################
-print(' Strides  !!!\n')
+
 # The below code will set up the data providers, random number
 # generator and logger objects needed for training runs. As
 # loading the data from file take a little while you generally
 # will probably not want to reload the data providers on
 # every training run. If you wish to reset their state you
 # should instead use the .reset() method of the data providers.
-
 
 # Seed a random number generator
 seed = 10102016

@@ -90,7 +90,7 @@ def save_and_present(experiment, stats, parameter):
 # Seed a random number generator
 seed = 10102016 
 rng = np.random.RandomState(seed)
-batch_size = 50
+batch_size = 100
 # Set up a logger object to print info about the training run to stdout
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -168,7 +168,7 @@ error = CrossEntropySoftmaxError()
 # learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'Con_relu_pool_x2_af256_re_x2_af'
+experiment = 'Con_relu_pool_x2_af256_re_x2_af_batch100'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
