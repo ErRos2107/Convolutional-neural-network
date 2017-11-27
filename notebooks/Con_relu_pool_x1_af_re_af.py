@@ -152,7 +152,7 @@ experiment = 'Con_relu_pool_x1_af_re'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=True)
+    model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
