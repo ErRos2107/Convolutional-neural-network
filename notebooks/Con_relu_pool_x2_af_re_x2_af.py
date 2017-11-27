@@ -114,7 +114,7 @@ stride=1
 # kernel shape and feature maps
 num_output_channels1, num_output_channels2, kernel_dim_1, kernel_dim_2 = 5,10,5,5
 # Initial input, final output shape
-inputs_units, output_dim, hidden_dim = 784, 47, 100
+inputs_units, output_dim, hidden_dim = 784, 47, 256
 #####################################################################################################
 # Rehape to image shape for first convol
 num_input_channels, input_dim_1, input_dim_2 = 1, 28, 28
@@ -168,7 +168,7 @@ error = CrossEntropySoftmaxError()
 # learning rule
 learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'Con_relu_pool_x2_af_re_x2_af'
+experiment = 'Con_relu_pool_x2_af256_re_x2_af'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
