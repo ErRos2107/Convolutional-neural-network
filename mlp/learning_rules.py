@@ -259,7 +259,7 @@ class AdamLearningRule(GradientDescentLearningRule):
     For parameter p[i] and corresponding Adam S[i] the updates for a
     scalar loss function `L` are of the form
         For each iteration t, Compute dW, db on the current mini-batch, then:
-		1. Mom_dW𝑑𝑊:=𝛽beta1*Mom_dW𝑑𝑊+(1−𝛽beta1)𝑑*dW^2
+		1. Mom_dW𝑑𝑊:=𝛽mom_coeff*Mom_dW𝑑𝑊+(1−𝛽mom_coeff)𝑑*dW^2
         2. S_dW𝑑𝑊:=𝛽beta2*S_dW𝑑𝑊+(1−𝛽beta2)𝑑*dW^2, bias as well
 		2. W𝑊:=𝑊W − learning_rate * Mom_dW/sqrt(S_dW), so as bias
 
@@ -267,7 +267,7 @@ class AdamLearningRule(GradientDescentLearningRule):
     and `beta` values in [0, 1] that determines the exponentially weighted averages.
     """
 
-    def __init__(self, learning_rate=1e-3, beta1=0.9,beta2=0.999):
+    def __init__(self, learning_rate=1e-3, mom_coeff=0.9,beta2=0.999):
         """Creates a new learning rule object.
 
         Args:
@@ -279,10 +279,10 @@ class AdamLearningRule(GradientDescentLearningRule):
             inclusive. Normally set to 0.9.
         """
         super(AdamLearningRule, self).__init__(learning_rate)
-        assert beta1 >= 0. and beta1 <= 1. and beta2 >=0. and beta2 <= 1., (
+        assert mom_coeff >= 0. and mom_coeff <= 1. and beta2 >=0. and beta2 <= 1., (
             'beta should be in the range [0, 1].'
         )
-        self.beta1 = beta1
+        self.mom_coeff = mom_coeff
         self.beta2 = beta2
         self.epsilon = 1e-8 # to avoid dividing zero
         self.iteration = 0
@@ -328,11 +328,11 @@ class AdamLearningRule(GradientDescentLearningRule):
         #self.iteration += 1
         for param, mom, s, grad in zip(self.params, self.moms, self.rms, grads_wrt_params):
             # s = beta*s+(1-beta)dw^2
-            mom += (self.beta1-1)*mom + (1-self.beta1)* grad
+            mom += (self.mom_coeff-1)*mom + (1-self.mom_coeff)* grad
             s += (self.beta2-1)*s + (1-self.beta2)* grad**2
             #s *= self.beta
             #s += (1-beta)* grad**2
 			# bias-correction
-            #mom = mom / ( 1 - self.beta1**self.iteration)
+            #mom = mom / ( 1 - self.mom_coeff**self.iteration)
             #s = s / ( 1 - self.beta2**self.iteration)
             param -= self.learning_rate*mom/(np.sqrt(s)+self.epsilon)
