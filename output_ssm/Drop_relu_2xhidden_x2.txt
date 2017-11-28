@@ -1,0 +1,4 @@
+Experiment Drop_relu_2xhidden_x2 best acc at Epoch=100 by parameter=Momentum
+error(train)= 0.4166182497555802, error(valid)=0.45138028970880184, 
+ error gap = 0.034762039953221635,  acc(valid)=0.8498734177215183
+Smallest error gap(after best acc epoch) = 0.034762039953221635 at Epoch=100

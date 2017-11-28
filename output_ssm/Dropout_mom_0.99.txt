@@ -1,0 +1,4 @@
+Experiment Dropout_mom_0.99 best acc at Epoch=1 by parameter=0.99
+error(train)= 2.4049622661958523, error(valid)=2.4154963791671333, 
+ error gap = 0.01053411297128104,  acc(valid)=0.3938607594936707
+Smallest error gap(after best acc epoch) = -0.006236897897283544 at Epoch=38
