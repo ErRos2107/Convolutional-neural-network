@@ -14,6 +14,7 @@ from mlp.optimisers import Optimiser
 from mlp.penalty import L1Penalty, L2Penalty
 from collections import defaultdict
 import logging
+import pickle
 from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 
 def train_model_and_plot_stats(
@@ -55,6 +56,10 @@ def train_model_and_plot_stats(
 # save and present the data
 def save_and_present(experiment, stats, parameter):
 
+    # save the model to disk
+    filename = experiment +'.sav'
+    pickle.dump(model, open(filename, 'wb'))
+
     np.savetxt(experiment+'_'+str(parameter)+'.csv', stats, delimiter=',')
 
     error_valid= stats[1:, keys['error(valid)']]
@@ -81,7 +86,7 @@ def save_and_present(experiment, stats, parameter):
 # Seed a random number generator
 seed = 10102016
 rng = np.random.RandomState(seed)
-batch_size = 256
+batch_size = 128
 # Set up a logger object to print info about the training run to stdout
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -90,19 +95,20 @@ logger.handlers = [logging.StreamHandler()]
 # Create data provider objects for the EMNIST data set
 train_data = EMNISTDataProvider('train', batch_size=batch_size, rng=rng)
 valid_data = EMNISTDataProvider('valid', batch_size=batch_size, rng=rng)
+test_data = EMNISTDataProvider('test', batch_size=batch_size, rng=rng)
 ####################################################################################################################################################
 # to ensure reproducibility of results
 rng.seed(seed)
 
 #setup hyperparameters
-learning_rate = 0.01
-num_epochs = 50
+learning_rate = 0.001
+num_epochs = 30
 stats_interval = 1
 
 pad=0
 stride=1
 # kernel shape and feature maps
-num_output_channels1, num_output_channels2, kernel_dim_1, kernel_dim_2 = 5,10,3,3
+num_output_channels1, num_output_channels2, kernel_dim_1, kernel_dim_2 = 6,12,3,3
 # Initial input, final output shape
 inputs_units, output_dim, hidden_dim = 784, 47, 256
 #####################################################################################################
@@ -143,9 +149,9 @@ model = MultipleLayerModel([
 
 error = CrossEntropySoftmaxError()
 # learning rule
-learning_rule = GradientDescentLearningRule(learning_rate=learning_rate,)
+learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 
-experiment = 'Con_relu_x2_pool_BN_x2'
+experiment = 'Con_relu_x2_pool_fc_BN_re_x2'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 optimiser, stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(

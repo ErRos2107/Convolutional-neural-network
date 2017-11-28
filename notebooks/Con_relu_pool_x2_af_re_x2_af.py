@@ -14,11 +14,12 @@ from mlp.optimisers import Optimiser
 from mlp.penalty import L1Penalty, L2Penalty
 from collections import defaultdict
 import logging
+import pickle
 from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 
 def train_model_and_plot_stats(
         model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False):
-    
+
     # As well as monitoring the error over training also monitor classification
     # accuracy i.e. proportion of most-probable predicted classes being equal to targets
     data_monitors={'acc': lambda y, t: (y.argmax(-1) == t.argmax(-1)).mean()}
@@ -35,7 +36,7 @@ def train_model_and_plot_stats(
     fig_1 = plt.figure(figsize=(8, 4))
     ax_1 = fig_1.add_subplot(111)
     for k in ['error(train)', 'error(valid)']:
-        ax_1.plot(np.arange(1, stats.shape[0]) * stats_interval, 
+        ax_1.plot(np.arange(1, stats.shape[0]) * stats_interval,
                   stats[1:, keys[k]], label=k)
     ax_1.legend(loc=0)
     ax_1.set_xlabel('Epoch number')
@@ -44,19 +45,21 @@ def train_model_and_plot_stats(
     fig_2 = plt.figure(figsize=(8, 4))
     ax_2 = fig_2.add_subplot(111)
     for k in ['acc(train)', 'acc(valid)']:
-        ax_2.plot(np.arange(1, stats.shape[0]) * stats_interval, 
+        ax_2.plot(np.arange(1, stats.shape[0]) * stats_interval,
                   stats[1:, keys[k]], label=k)
     ax_2.legend(loc=0)
     ax_2.set_xlabel('Epoch number')
-    
-    return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
+
+    return optimiser, stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
 
 ################################################################################
-# save and present the data
-save_stats= defaultdict()
 def save_and_present(experiment, stats, parameter):
 
-    np.savetxt(experiment +'.csv', stats, delimiter=',')
+    # save the model to disk
+    filename = experiment +'.sav'
+    pickle.dump(model, open(filename, 'wb'))
+
+    np.savetxt(experiment+'_'+str(parameter)+'.csv', stats, delimiter=',')
 
     error_valid= stats[1:, keys['error(valid)']]
     error_train= stats[1:, keys['error(train)']]
@@ -78,17 +81,8 @@ def save_and_present(experiment, stats, parameter):
     print('Smallest error gap(after best acc epoch) = {} at Epoch={}'.
           format(min(overfitting[np.argmax(acc_valid):]),np.argmin(overfitting[np.argmax(acc_valid):])+np.argmax(acc_valid)+1))
 
-################################################################################
-
-# The below code will set up the data providers, random number
-# generator and logger objects needed for training runs. As
-# loading the data from file take a little while you generally
-# will probably not want to reload the data providers on
-# every training run. If you wish to reset their state you
-# should instead use the .reset() method of the data providers.
-
 # Seed a random number generator
-seed = 10102016 
+seed = 10102016
 rng = np.random.RandomState(seed)
 batch_size = 100
 # Set up a logger object to print info about the training run to stdout
@@ -119,10 +113,10 @@ inputs_units, output_dim, hidden_dim = 784, 47, 256
 # Rehape to image shape for first convol
 num_input_channels, input_dim_1, input_dim_2 = 1, 28, 28
 # the ouput shape of the first convol layer is (batch_size, num_output_channels, Con_out_1, Con_out_1)
-Con_out_1 =  (input_dim_1 - kernel_dim_1+2*pad)//stride + 1 
+Con_out_1 =  (input_dim_1 - kernel_dim_1+2*pad)//stride + 1
 # Flatten the image for relu
 # Reshape to image shape for first Maxpool
-# the ouput shape of the first Maxpool 
+# the ouput shape of the first Maxpool
 Max_out_1 = Con_out_1//2
 #####################################################################################################
 # The input shape of the second conv layer
@@ -132,7 +126,7 @@ Con_out_2 = (Max_out_1 - kernel_dim_1+2*pad)//stride + 1
 # Flatten the image for relu
 # Rehape to image shape for second maxpool
 num_input_channels3, input_dim_1_4, input_dim_2_4 = num_output_channels2, Con_out_2, Con_out_2
-# the ouput shape of the second Maxpool 
+# the ouput shape of the second Maxpool
 Max_out_2 = Con_out_2//2
 #####################################################################################################
 # then flatten the output
@@ -145,18 +139,18 @@ model = MultipleLayerModel([
     ReshapeLayer((num_input_channels,input_dim_1,input_dim_2)),
 
     ConvolutionalLayer(num_input_channels, num_output_channels1, input_dim_1, input_dim_2, kernel_dim_1, kernel_dim_2),
-    ReshapeLayer(), 
+    ReshapeLayer(),
     ReluLayer(),
     ReshapeLayer((num_output_channels1, Con_out_1, Con_out_1)),
     MaxPoolingLayer(),
-    
+
     ConvolutionalLayer(num_output_channels1, num_output_channels2, Max_out_1, Max_out_1, kernel_dim_1, kernel_dim_2),
-    ReshapeLayer(), 
+    ReshapeLayer(),
     ReluLayer(),
 	ReshapeLayer((num_output_channels2, Con_out_2, Con_out_2)),
     MaxPoolingLayer(),
-    
-	ReshapeLayer(), 
+
+	ReshapeLayer(),
 	AffineLayer(Fc_in, hidden_dim, weights_init, biases_init),
     ReluLayer(),
     AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
@@ -171,12 +165,13 @@ learning_rule = AdamLearningRule(learning_rate=learning_rate,)
 experiment = 'Con_relu_pool_x2_af256_re_x2_af_batch100'
 
 #return stats, keys, run_time, fig_1, ax_1, fig_2, ax_2
-stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
+optimiser, stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
     model, error, learning_rule, train_data, valid_data, num_epochs, stats_interval, notebook=False)
 fig_1.savefig(experiment+ '_learning_rate_{}_error.pdf'.format(learning_rate))
 fig_2.savefig(experiment+ '_learning_rate_{}_accuracy.pdf'.format(learning_rate))
 
 save_and_present(experiment, stats, learning_rate)
 
-save_stats[experiment] = stats
-
+result = optimiser.eval_monitors(test_data, 'test')
+print('Test error:    ' + str(save_results[experiment]['errortest']))
+print('Test accuracy: ' + str(save_results[experiment]['acctest']))
