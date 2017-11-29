@@ -1,0 +1,4 @@
+Experiment Con_relux2_pool_fc_re_BNx2 best acc at Epoch=30 by parameter=0.001
+error(train)= 0.26474631600458054, error(valid)=0.48474825003857674, 
+ error gap = 0.2200019340339962,  acc(valid)=0.8497205284552846
+Smallest error gap(after best acc epoch) = 0.2200019340339962 at Epoch=30

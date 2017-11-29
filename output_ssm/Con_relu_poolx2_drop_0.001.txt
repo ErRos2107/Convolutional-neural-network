@@ -1,0 +1,4 @@
+Experiment Con_relu_poolx2_drop best acc at Epoch=47 by parameter=0.001
+error(train)= 0.2970422010920606, error(valid)=0.3433976274518233, 
+ error gap = 0.0463554263597627,  acc(valid)=0.8790015243902439
+Smallest error gap(after best acc epoch) = 0.0463554263597627 at Epoch=47
