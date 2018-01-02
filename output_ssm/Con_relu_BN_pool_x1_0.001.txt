@@ -1,4 +1,0 @@
-Experiment Con_relu_BN_pool_x1 best acc at Epoch=5 by parameter=0.001
-error(train)= 3.9230163592206804, error(valid)=3.920198188401753, 
- error gap = -0.0028181708189274346,  acc(valid)=0.02284810126582272
-Smallest error gap(after best acc epoch) = -0.0028181708189274346 at Epoch=5

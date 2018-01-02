@@ -1,4 +1,0 @@
-Experiment Relu_L2Penal_1e-4_x2 best acc at Epoch=59 by parameter=0.0001
-error(train)= 0.22569236583227723, error(valid)=0.4430744723402421, 
- error gap = 0.21738210650796488,  acc(valid)=0.8565822784810126
-Smallest error gap(after best acc epoch) = 0.21738210650796488 at Epoch=59

@@ -1,4 +1,0 @@
-Experiment Relu_x2 best acc at Epoch=63 by parameter=GradientDescent
-error(train)= 0.2009188077460504, error(valid)=0.47986902674019105, 
- error gap = 0.27895021899414063,  acc(valid)=0.8526582278481014
-Smallest error gap(after best acc epoch) = 0.27895021899414063 at Epoch=63
