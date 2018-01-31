@@ -1,3 +1,13 @@
+# Convolutional networks
+## CNN layer and baseline
+Architecture:  
+- Conv -> relu  
+- (Conv -> Relu -> Pool)xN -> Affin -> Relu  
+- (Conv -> Relu)xN -> Pool -> Affin -> Relu
+
+
+
+
 # Machine Learning Practical
 
 This repository contains the code for the University of Edinburgh [School of Informatics](http://www.inf.ed.ac.uk) course [Machine Learning Practical](http://www.inf.ed.ac.uk/teaching/courses/mlp/).
