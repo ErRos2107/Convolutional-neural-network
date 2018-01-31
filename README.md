@@ -1,24 +1,20 @@
 # Convolutional networks
+This project apply convolutional neural networks(CNN) with dropout and batch normalization to [EMNIST(Extended MNIST)](https://www.nist.gov/itl/iad/image-group/emnist-dataset) classification problem.
+
+The EMNIST Balanced dataset, with 131,600 characters. 47 balanced classes. EMNIST extends MNIST by including images of handwritten letters (upper and lower case) as well as handwritten digits. There are 47 different labels. Here for the experiments, we randomly chose 100,000 example for training, 15,800examples for validation and 15,800examples for testing.
 ## CNN layer and baseline
-Architecture:  
-- Conv -> relu  
-- (Conv -> Relu -> Pool)xN -> Affin -> Relu  
+Architecture:
+- Conv -> relu
+- (Conv -> Relu -> Pool)xN -> Affin -> Relu
 - (Conv -> Relu)xN -> Pool -> Affin -> Relu
+![](/images/CNN_accuracy_baseline.png)
 
+## CNN with batch normalization
+To see whether inserting batch normalization layer before or after the activation layer, we compare two simple model based on base line DNN model and insert a batch normalization layer before and after the relu layer. The hyperparameter is set to be the same as the base line model.
+So we will try two experiments:
+(Conv -> RELU -> Pool)x2 -> BatchN -> RELU
+(Conv -> RELU -> Pool)x2 -> RELU -> BatchN
+![](/images/CNN_accuracy_BNre.png)
+![](/images/CNN_error_BNre.png)
 
-
-
-# Machine Learning Practical
-
-This repository contains the code for the University of Edinburgh [School of Informatics](http://www.inf.ed.ac.uk) course [Machine Learning Practical](http://www.inf.ed.ac.uk/teaching/courses/mlp/).
-
-This assignment-based course is focused on the implementation and evaluation of machine learning systems. Students who do this course will have experience in the design, implementation, training, and evaluation of machine learning systems.
-
-The code in this repository is split into:
-
-  *  a Python package `mlp`, a [NumPy](http://www.numpy.org/) based neural network package designed specifically for the course that students will implement parts of and extend during the course labs and assignments,
-  *  a series of [Jupyter](http://jupyter.org/) notebooks in the `notebooks` directory containing explanatory material and coding exercises to be completed during the course labs.
-
-## Getting set up
-
-Detailed instructions for setting up a development environment for the course are given in [this file](notes/environment-set-up.md). Students doing the course will spend part of the first lab getting their own environment set up.
+## more...
