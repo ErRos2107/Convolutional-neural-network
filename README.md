@@ -12,8 +12,8 @@ Architecture:
 ## CNN with batch normalization
 To see whether inserting batch normalization layer before or after the activation layer, we compare two simple model based on base line DNN model and insert a batch normalization layer before and after the relu layer. The hyperparameter is set to be the same as the base line model.
 So we will try two experiments:
-(Conv -> RELU -> Pool)x2 -> BatchN -> RELU
-(Conv -> RELU -> Pool)x2 -> RELU -> BatchN
+- (Conv -> RELU -> Pool)x2 -> BatchN -> RELU
+- (Conv -> RELU -> Pool)x2 -> RELU -> BatchN
 ![](/images/CNN_accuracy_BNre.png)
 ![](/images/CNN_error_BNre.png)
 
